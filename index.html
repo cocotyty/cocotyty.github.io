@@ -132,12 +132,19 @@
   <!-- ===== API PROMPT ===== -->
   <div id="api-prompt" class="overlay" style="display:none">
     <div class="overlay-bg" id="api-prompt-bg"></div>
-    <div class="confirm-panel">
-      <p class="confirm-text">⚠ 未配置 API</p>
-      <p class="confirm-sub" id="api-prompt-text">请先在设置中配置 API Key</p>
+    <div class="confirm-panel" style="text-align:left;width:88%;max-width:340px">
+      <p class="confirm-text" style="text-align:center">🔑 配置 API</p>
+      <p class="confirm-sub" style="text-align:center;margin-bottom:16px">需要 API Key 才能生成故事</p>
+      <label class="field" style="margin-bottom:12px">
+        <span class="field-label">API Key</span>
+        <input type="password" class="input" id="prompt-api-key" placeholder="sk-..." autocomplete="off">
+      </label>
+      <label class="field" style="margin-bottom:16px">
+        <span class="field-label">API 端点</span>
+        <input type="url" class="input" id="prompt-api-endpoint" value="https://api.deepseek.com/v1/chat/completions" autocomplete="off">
+      </label>
       <div class="confirm-actions" style="flex-direction:column">
-        <button class="btn btn-primary" id="api-prompt-settings">去设置</button>
-        <button class="btn" id="api-prompt-preview">本地预览模式（体验有限）</button>
+        <button class="btn btn-primary" id="api-prompt-save">保存并开始</button>
         <button class="btn" id="api-prompt-close" style="color:var(--text-dim);border:none;background:none">取消</button>
       </div>
     </div>

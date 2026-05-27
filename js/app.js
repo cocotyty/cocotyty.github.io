@@ -351,26 +351,37 @@ const App = {
   },
 
   _showApiPrompt() {
-    document.getElementById('api-prompt-text').textContent =
-      '未检测到 API Key。没有 LLM 接口，故事将由本地模板生成，体验有限。';
+    const config = Store.getConfig();
+    document.getElementById('prompt-api-key').value = config.apiKey || '';
+    document.getElementById('prompt-api-endpoint').value = config.apiEndpoint || 'https://api.deepseek.com/v1/chat/completions';
     document.getElementById('api-prompt').style.display = 'flex';
+    setTimeout(() => document.getElementById('prompt-api-key').focus(), 300);
   },
 
   _bindApiPrompt() {
-    document.getElementById('api-prompt-preview').addEventListener('click', () => {
+    document.getElementById('api-prompt-save').addEventListener('click', () => {
+      const key = document.getElementById('prompt-api-key').value.trim();
+      const endpoint = document.getElementById('prompt-api-endpoint').value.trim();
+      if (!key) {
+        this._flashMessage('请输入 API Key');
+        return;
+      }
+      const config = Store.getConfig();
+      config.apiKey = key;
+      config.apiEndpoint = endpoint || 'https://api.deepseek.com/v1/chat/completions';
+      Store.saveConfig();
       document.getElementById('api-prompt').style.display = 'none';
       this.showScreen('world-gen');
-    });
-    document.getElementById('api-prompt-settings').addEventListener('click', () => {
-      document.getElementById('api-prompt').style.display = 'none';
-      this.showScreen('settings');
-      this._populateSettings();
     });
     document.getElementById('api-prompt-close').addEventListener('click', () => {
       document.getElementById('api-prompt').style.display = 'none';
     });
     document.getElementById('api-prompt-bg').addEventListener('click', () => {
       document.getElementById('api-prompt').style.display = 'none';
+    });
+    // Enter key to save
+    document.getElementById('prompt-api-key').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('api-prompt-save').click();
     });
   },
 
@@ -504,12 +515,6 @@ const App = {
     const game = Store.getGame();
     const config = Store.getConfig();
 
-    if (!config.apiKey) {
-      this.showScreen('play');
-      this._useFallbackPrologue();
-      return;
-    }
-
     try {
       const result = await LLM.generatePrologue(game.worldBible, game.worldSummary, config);
 
@@ -531,58 +536,9 @@ const App = {
       this.showScreen('play');
       this._loadPlayContent();
     } catch (err) {
-      console.warn('Prologue generation failed, using fallback:', err);
-      this.showScreen('play');
-      this._useFallbackPrologue();
+      this._removeThinkingIndicator();
+      this._showError('故事生成失败: ' + err.message + '\n请检查 API Key 和网络连接');
     }
-  },
-
-  _useFallbackPrologue() {
-    const game = Store.getGame();
-    const loc = this._extractSummary('开场', game.worldSummary);
-    const state = this._extractSummary('状态', game.worldSummary);
-
-    const narrative = `他醒来的第一个感知是冷。
-
-${loc}中，他的意识在一片黑暗中漂浮。${state}。
-
-他尽力回想——但记忆是一片完整的空白。没有名字，没有面孔，没有来处。像有人用一把精致的刀，把"过去"这块组织从他的大脑里整块剥离了。
-
-他低头检查自己。救生服上印着一个模糊的标志，右臂有一道被能量武器撕裂的口子。胸口的口袋里隔着布料传来温润的触感——一块硬物，像一颗微缩的心脏在跳动。
-
-\`\`\`
-维生剩余：71小时42分钟
-通讯状态：信号干扰
-最近信号源：空间站「锈铁棺」— 自动回收引导已锁定
-\`\`\`
-
-追杀中。他在默念这个词时没有恐惧，只有一种奇异的冷静。他开始操作控制台。`;
-
-    game.history = [{
-      turn: 1,
-      type: 'story',
-      content: narrative,
-      choices: [
-        '① 接受空间站的自动回收引导',
-        '② 尝试修复通讯设备发出来救信号',
-        '③ 搜索记忆碎片，看看能想起什么'
-      ],
-      playerChoice: -1
-    }];
-    Pacing.recordTurn();
-    game.pacing = Pacing.getState();
-    game.meta.totalTurns = 1;
-    Store.saveGame();
-    this._loadPlayContent();
-  },
-
-  _extractSummary(field, summary) {
-    const patterns = [`${field}[：:](.+?)(?:\\n|$)`];
-    for (const p of patterns) {
-      const m = summary.match(new RegExp(p));
-      if (m) return m[1].trim();
-    }
-    return '未知区域';
   },
 
   /* ===== PLAY SCREEN ===== */
@@ -649,38 +605,7 @@ ${loc}中，他的意识在一片黑暗中漂浮。${state}。
     container.textContent = '';
     const beat = document.getElementById('story-beat');
     beat.textContent = '';
-
-    if (Pacing.currentChapter === 1) {
-      const text = `他醒来的第一个感知是冷。
-
-维生舱的红色警示灯把整个逃逸舱的内壁染成濒危的血色。他撑起身体，记忆是一片完整的空白——没有名字，没有面孔，没有来处。像有人用一把精致的刀，把"过去"从他大脑里整块剥离了。
-
-控制台上跳跃着几组数据：维生剩余71小时，通讯信号干扰中，最近信号源——空间站「锈铁棺」的自动回收引导已锁定。他操作控制台，接受回收引导。引擎点火，后背砸进座椅。
-
-逃逸舱被机械臂塞进废物处理通道。金属刮擦的声音像巨兽在磨牙。`;
-      this._displayStory(text);
-      setTimeout(() => this._showChoices([
-        '① 探索空间站的中央区域',
-        '② 检查通讯设备，尝试发送信号',
-        '③ 搜索身边物品，看看有没有线索'
-      ]), 300);
-    } else if (Pacing.currentChapter === 2) {
-      const text = `维护舱的引擎在他身后熄火。碎星镇的泊位就在前方。
-
-这是一个由钢板和希望拼凑起来的地方。霓虹招牌与纸灯笼在同一片屋檐下争抢视线。他踏上泊位甲板时，一个满手机油的中年男人朝他喊道：
-
-"新来的？好好好！铁炉堡机械坊，修船修枪修殖装——先喝酒去？我请！等等，你先把账结了再说。"
-
-男人笑起来，中气十足，在嘈杂的港口里像一面鼓。`;
-      this._displayStory(text);
-      setTimeout(() => this._showChoices([
-        '① 跟着这个豪爽的铁匠去喝酒，了解本地情况',
-        '② 婉拒好意，先去打探情报',
-        '③ 找个隐蔽的角落，检查那枚神秘的玉简'
-      ]), 300);
-    } else {
-      container.textContent = '故事继续展开...';
-    }
+    container.textContent = '等待故事生成...';
   },
 
   _addPageMarker() {
@@ -789,15 +714,9 @@ ${loc}中，他的意识在一片黑暗中漂浮。${state}。
     Pacing.recordTurn();
 
     try {
-      let result;
-
-      if (config.apiKey) {
-        const pacXml = Pacing.getPacingXml();
-        const trope = this._getCurrentTrope();
-        result = await LLM.generateStory(pacXml, game.worldSummary, history, choiceText, config, trope);
-      } else {
-        result = this._localResponse(history.length + 1, choiceText);
-      }
+      const pacXml = Pacing.getPacingXml();
+      const trope = this._getCurrentTrope();
+      const result = await LLM.generateStory(pacXml, game.worldSummary, history, choiceText, config, trope);
 
       history.push({
         turn: history.length + 1,
@@ -859,14 +778,8 @@ ${loc}中，他的意识在一片黑暗中漂浮。${state}。
     Pacing.recordTurn();
 
     try {
-      let result;
-
-      if (config.apiKey) {
-        const pacXml = Pacing.getPacingXml();
-        result = await LLM.generateStory(pacXml, game.worldSummary, history, choiceText, config);
-      } else {
-        result = this._localResponse(history.length + 1, choiceText);
-      }
+      const pacXml = Pacing.getPacingXml();
+      const result = await LLM.generateStory(pacXml, game.worldSummary, history, choiceText, config);
 
       history.push({
         turn: history.length + 1,
@@ -924,54 +837,6 @@ ${loc}中，他的意识在一片黑暗中漂浮。${state}。
         this._flashMessage('🏆 故事终章');
       }
     }
-  },
-
-  _localResponse(turn, choiceText) {
-    const responses = [
-      {
-        narrative: `他沿着走廊向前走去。脚步声在空心的金属地板上回荡，像敲击一具巨大的铁棺。
-
-食堂的灯还亮着——或者说是"还亮着"。荧光灯管在七年的服役后已经暗淡到发出一种接近深蓝的微光。餐桌上的餐盘还在，一把叉子搁在碗沿上，碗里的食物早已结晶化。
-
-一切都像是用餐的人只是暂时离开。但没有人回来。
-
-广播突然响了——"请到C区集合，有重要通知。"合成女声，语气温和。但在这一片死寂中，温和比尖叫更让人毛骨悚然。`,
-        choices: ['① 循着广播前往C区', '② 调查最近的个人终端', '③ 检查通风管道']
-      },
-      {
-        narrative: `广播声在空荡荡的走廊里回荡。他数着脚步，保持着冷静的节奏。
-
-C区的门虚掩着。透过门缝，他看到了一排排休眠舱——矿业公司的标准配置，每个舱位上都贴着编号和姓名标签。但所有的舱盖都是打开的，内部的液体早已蒸发，留下一层淡蓝色的结晶。
-
-在第47号休眠舱的玻璃上，有人用指甲刻了一行字：
-
-"镜子不是门。别让它照到你。"`,
-        choices: ['① 搜索C区的控制终端', '② 检查其他休眠舱的刻字', '③ 前往钻机控制室']
-      },
-      {
-        narrative: `终端屏幕亮起时，他看到了最后一条使用记录：
-
-> 星历1466年·霜月·第17日
-> 博士，我们挖到东西了。钻头撞上了一面"镜子"。反射的不是光，是
-> 一切。凌破虚侯爵昨天来过，他说那是一座建筑的外墙。我不管那是什么
-> ——我只知道它不应该被唤醒。
-
-他盯着那行字看了很久。凌破虚。黯星侯。这个名字像一块沉入水底的石头，在他的记忆深处激起了一圈涟漪——但他抓不住它。`,
-        choices: ['① 继续搜索情报', '② 前往钻机控制室现场查看', '③ 找个安全的地方休息整理思绪']
-      },
-      {
-        narrative: `空间站的结构在他脚下微微颤动。他意识到——这座废弃了七年的铁棺，正在苏醒。
-
-不是人的苏醒。是某种更深层的东西。钻机方向传来低沉的嗡鸣声，像是某种大型设备正在启动。墙上的应急灯闪烁着，在忽明忽暗的光线中，他瞥见走廊尽头的阴影里有什么东西在移动。
-
-他眨了眨眼。影子不动了。
-
-或许是错觉。或许是别的什么。`,
-        choices: ['① 前往钻机控制室调查', '② 打开通讯设备寻求帮助', '③ 检查身上的玉简——它在发烫']
-      }
-    ];
-
-    return responses[(turn - 2) % responses.length];
   },
 
   _getCurrentTrope() {
