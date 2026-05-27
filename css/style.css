@@ -274,6 +274,23 @@ select.input {
   padding: 12px 0;
   padding-bottom: calc(12px + var(--safe-bottom));
   margin-top: auto;
+  gap: 8px;
+}
+
+.api-status {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: rgba(68, 255, 136, 0.1);
+  color: var(--accent-green);
+  border: 1px solid rgba(68, 255, 136, 0.2);
+  flex-shrink: 0;
+}
+
+.api-status.warning {
+  background: rgba(255, 215, 0, 0.1);
+  color: var(--accent-gold);
+  border-color: rgba(255, 215, 0, 0.2);
 }
 
 .btn-sm {

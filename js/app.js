@@ -32,6 +32,7 @@ const App = {
     this._bindSettings();
     this._bindPlay();
     this._bindMenu();
+    this._bindApiPrompt();
     this._restoreScreen();
   },
 
@@ -72,12 +73,15 @@ const App = {
     });
 
     document.getElementById('btn-new-game').addEventListener('click', () => {
-      if (Store.getConfig().debugMode) {
+      const config = Store.getConfig();
+      if (config.debugMode) {
         const preset = Store.getDebugPreset();
         Store.setGame(preset);
         Pacing.init(preset.pacing);
         this.showScreen('play');
         this._loadPlayContent();
+      } else if (!config.apiKey) {
+        this._showApiPrompt();
       } else {
         this.showScreen('world-gen');
       }
@@ -177,6 +181,17 @@ const App = {
 
       container.appendChild(card);
     });
+
+    // Update API status indicator
+    const statusEl = document.getElementById('api-status');
+    const config = Store.getConfig();
+    if (config.apiKey) {
+      statusEl.textContent = '⚡ 已连接';
+      statusEl.className = 'api-status';
+    } else {
+      statusEl.textContent = '⚠ 未配置';
+      statusEl.className = 'api-status warning';
+    }
   },
 
   _loadSaveAndPlay(slot) {
@@ -333,6 +348,30 @@ const App = {
       this._flashMessage('已删除');
       this.showScreen('splash');
     }
+  },
+
+  _showApiPrompt() {
+    document.getElementById('api-prompt-text').textContent =
+      '未检测到 API Key。没有 LLM 接口，故事将由本地模板生成，体验有限。';
+    document.getElementById('api-prompt').style.display = 'flex';
+  },
+
+  _bindApiPrompt() {
+    document.getElementById('api-prompt-preview').addEventListener('click', () => {
+      document.getElementById('api-prompt').style.display = 'none';
+      this.showScreen('world-gen');
+    });
+    document.getElementById('api-prompt-settings').addEventListener('click', () => {
+      document.getElementById('api-prompt').style.display = 'none';
+      this.showScreen('settings');
+      this._populateSettings();
+    });
+    document.getElementById('api-prompt-close').addEventListener('click', () => {
+      document.getElementById('api-prompt').style.display = 'none';
+    });
+    document.getElementById('api-prompt-bg').addEventListener('click', () => {
+      document.getElementById('api-prompt').style.display = 'none';
+    });
   },
 
   /* ===== SETTINGS ===== */
