@@ -354,6 +354,7 @@ const App = {
     const config = Store.getConfig();
     document.getElementById('prompt-api-key').value = config.apiKey || '';
     document.getElementById('prompt-api-endpoint').value = config.apiEndpoint || 'https://api.deepseek.com/v1/chat/completions';
+    document.getElementById('prompt-api-model').value = config.model || 'deepseek-chat';
     document.getElementById('api-prompt').style.display = 'flex';
     setTimeout(() => document.getElementById('prompt-api-key').focus(), 300);
   },
@@ -362,6 +363,7 @@ const App = {
     document.getElementById('api-prompt-save').addEventListener('click', () => {
       const key = document.getElementById('prompt-api-key').value.trim();
       const endpoint = document.getElementById('prompt-api-endpoint').value.trim();
+      const model = document.getElementById('prompt-api-model').value.trim();
       if (!key) {
         this._flashMessage('请输入 API Key');
         return;
@@ -369,6 +371,7 @@ const App = {
       const config = Store.getConfig();
       config.apiKey = key;
       config.apiEndpoint = endpoint || 'https://api.deepseek.com/v1/chat/completions';
+      config.model = model || 'deepseek-chat';
       Store.saveConfig();
       document.getElementById('api-prompt').style.display = 'none';
       this.showScreen('world-gen');
@@ -379,6 +382,49 @@ const App = {
     document.getElementById('api-prompt-bg').addEventListener('click', () => {
       document.getElementById('api-prompt').style.display = 'none';
     });
+
+    // Fetch models
+    document.getElementById('prompt-fetch-models').addEventListener('click', async () => {
+      const endpoint = document.getElementById('prompt-api-endpoint').value.trim();
+      const key = document.getElementById('prompt-api-key').value.trim();
+      if (!endpoint || !key) {
+        this._flashMessage('请先输入 API 端点和 Key');
+        return;
+      }
+      // Convert chat endpoint to models endpoint
+      const modelsUrl = endpoint.replace(/\/chat\/completions.*$/, '/models');
+      try {
+        const resp = await fetch(modelsUrl, { headers: { 'Authorization': `Bearer ${key}` } });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const models = data.data || data;
+        const list = document.getElementById('prompt-model-list');
+        list.innerHTML = '';
+        list.style.display = 'block';
+        (Array.isArray(models) ? models : []).forEach(m => {
+          const id = m.id || m.name || m;
+          const item = document.createElement('div');
+          item.textContent = id;
+          Object.assign(item.style, {
+            padding: '6px 10px',
+            fontSize: '13px',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            borderRadius: '4px'
+          });
+          item.addEventListener('mouseenter', () => item.style.background = 'rgba(100,216,255,0.08)');
+          item.addEventListener('mouseleave', () => item.style.background = '');
+          item.addEventListener('click', () => {
+            document.getElementById('prompt-api-model').value = id;
+            list.style.display = 'none';
+          });
+          list.appendChild(item);
+        });
+      } catch (e) {
+        this._flashMessage('获取模型列表失败: ' + e.message);
+      }
+    });
+
     // Enter key to save
     document.getElementById('prompt-api-key').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') document.getElementById('api-prompt-save').click();

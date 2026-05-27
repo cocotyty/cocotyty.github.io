@@ -139,9 +139,17 @@
         <span class="field-label">API Key</span>
         <input type="password" class="input" id="prompt-api-key" placeholder="sk-..." autocomplete="off">
       </label>
-      <label class="field" style="margin-bottom:16px">
+      <label class="field" style="margin-bottom:8px">
         <span class="field-label">API 端点</span>
         <input type="url" class="input" id="prompt-api-endpoint" value="https://api.deepseek.com/v1/chat/completions" autocomplete="off">
+      </label>
+      <label class="field" style="margin-bottom:12px">
+        <span class="field-label">模型</span>
+        <div style="display:flex;gap:6px">
+          <input type="text" class="input" id="prompt-api-model" value="deepseek-chat" placeholder="模型名称" style="flex:1">
+          <button class="btn btn-sm" id="prompt-fetch-models" style="flex-shrink:0;font-size:12px;padding:8px 10px;width:auto">获取</button>
+        </div>
+        <div id="prompt-model-list" style="display:none;margin-top:6px;max-height:120px;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border-color);border-radius:6px;padding:4px"></div>
       </label>
       <div class="confirm-actions" style="flex-direction:column">
         <button class="btn btn-primary" id="api-prompt-save">保存并开始</button>
