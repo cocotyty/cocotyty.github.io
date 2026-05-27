@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>星穹编年史</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div id="app">
+
+  <!-- ===== SPLASH / BOOKSHELF ===== -->
+  <div id="screen-splash" class="screen active">
+    <div class="screen-inner">
+      <div class="splash-header">
+        <span class="splash-icon">✦</span>
+        <h1>星穹编年史</h1>
+        <p class="splash-subtitle">Chronicles of the Starry Void</p>
+      </div>
+      <button class="btn btn-primary splash-new-btn" id="btn-new-game">✦ 创造新世界</button>
+      <div class="bookshelf" id="bookshelf">
+        <div class="bookshelf-empty" id="bookshelf-empty">
+          <p>还没有世界</p>
+          <p class="bookshelf-hint">点击上方按钮，让群星为你排列一个全新的宇宙</p>
+        </div>
+      </div>
+      <div class="splash-footer">
+        <button class="btn btn-sm" id="btn-settings" data-goto="settings">⚙ 设置</button>
+        <span class="splash-version">v0.1</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS ===== -->
+  <div id="screen-settings" class="screen">
+    <div class="screen-inner">
+      <div class="settings-header">
+        <button class="btn-back" data-goto="splash">←</button>
+        <h2>⚙ 设置</h2>
+      </div>
+      <div class="settings-body">
+        <label class="field">
+          <span class="field-label">API 端点</span>
+          <input type="url" class="input" id="api-endpoint" placeholder="https://api.openai.com/v1/chat/completions" autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="field-label">API Key</span>
+          <input type="password" class="input" id="api-key" placeholder="sk-..." autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="field-label">模型</span>
+            <select class="input" id="api-model">
+            <option value="deepseek-chat">DeepSeek V3</option>
+            <option value="deepseek-reasoner">DeepSeek R1</option>
+            <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
+            <option value="gpt-4o">GPT-4o</option>
+            <option value="gpt-4o-mini">GPT-4o Mini</option>
+            <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+            <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+            <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+            <option value="custom">自定义</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">温度 (创造力)</span>
+          <div class="slider-row">
+            <span>冷静</span>
+            <input type="range" class="slider" id="api-temp" min="0.3" max="1.5" step="0.1" value="0.9">
+            <span>奔放</span>
+          </div>
+          <span class="slider-value" id="temp-value">0.9</span>
+        </label>
+        <label class="field field-toggle">
+          <span class="field-label">调试模式</span>
+          <label class="toggle">
+            <input type="checkbox" id="api-debug">
+            <span class="toggle-slider"></span>
+          </label>
+        </label>
+        <p class="field-hint">开启后跳过掷骰，直接加载预设世界</p>
+        <button class="btn btn-primary" id="settings-save">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== WORLD GEN ===== -->
+  <div id="screen-world-gen" class="screen">
+    <div class="screen-inner">
+      <div class="settings-header">
+        <button class="btn-back" data-goto="splash">←</button>
+        <h2>✦ 掷骰定世</h2>
+      </div>
+      <div id="dice-container" class="dice-container">
+        <p class="dice-placeholder">命运的骰子尚未掷出...</p>
+        <p class="dice-hint">（骰子系统将在 Phase 2 实现）</p>
+      </div>
+      <div class="dice-actions">
+        <button class="btn btn-primary" id="btn-confirm-world" disabled>
+          确认世界 · 命运开始
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== EDIT WORLD ===== -->
+  <div id="screen-edit" class="screen">
+    <div class="screen-inner">
+      <div class="settings-header">
+        <button class="btn-back" id="btn-edit-back">←</button>
+        <h2>✎ 编辑世界</h2>
+      </div>
+      <div class="edit-info" id="edit-info">
+        <span class="field-label">世界名</span>
+        <input type="text" class="input" id="edit-world-name" placeholder="输入世界名称">
+      </div>
+      <div id="edit-dice-container" class="dice-container"></div>
+      <div class="dice-actions" style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-primary" id="btn-edit-save">保存修改</button>
+        <button class="btn btn-danger" id="btn-edit-delete">🗑 删除此世界</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFIRM DIALOG ===== -->
+  <div id="confirm-dialog" class="overlay" style="display:none">
+    <div class="overlay-bg" id="confirm-bg"></div>
+    <div class="confirm-panel">
+      <p class="confirm-text" id="confirm-text">确定要删除此世界吗？</p>
+      <p class="confirm-sub" id="confirm-sub">此操作不可撤销</p>
+      <div class="confirm-actions">
+        <button class="btn btn-danger confirm-yes" id="confirm-yes">删除</button>
+        <button class="btn confirm-no" id="confirm-no">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PROLOGUE ===== -->
+  <div id="screen-prologue" class="screen">
+    <div class="screen-inner">
+      <div class="prologue-content">
+        <div class="prologue-loader">
+          <div class="spin-ring"></div>
+          <p>命运的齿轮开始转动...</p>
+          <p class="prologue-sub">群星正在排列，世界正在成形</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PLAY ===== -->
+  <div id="screen-play" class="screen">
+    <div class="play-header">
+      <span class="play-chapter" id="play-chapter">第1章 · 铁棺苏醒</span>
+      <button class="play-menu-btn" id="btn-menu">⋯</button>
+    </div>
+
+    <div class="play-story" id="play-story">
+      <div class="story-content" id="story-content"></div>
+      <div class="story-beat" id="story-beat"></div>
+    </div>
+
+    <!-- ===== REASONING OVERLAY ===== -->
+    <div id="reasoning-overlay" class="reasoning-overlay" style="display:none">
+      <div class="reasoning-bg"></div>
+      <div class="reasoning-content">
+        <div class="reasoning-constellation">
+          <span class="c-star s1">✦</span>
+          <span class="c-star s2">✦</span>
+          <span class="c-star s3">✦</span>
+          <span class="c-star s4">✦</span>
+          <span class="c-star s5">✦</span>
+          <span class="c-glow"></span>
+        </div>
+        <div class="reasoning-text">
+          <span class="reasoning-msg" id="reasoning-msg">星穹推演中</span>
+          <span class="reasoning-dots"><span>.</span><span>.</span><span>.</span></span>
+        </div>
+        <div class="reasoning-sub" id="reasoning-sub">群星正在排列</div>
+        <div class="reasoning-elapsed" id="reasoning-elapsed"></div>
+      </div>
+    </div>
+
+    <div class="play-input-area" id="play-input-area" style="display:none">
+      <div class="choices" id="choices-container">
+        <button class="choice-btn" data-idx="0">① 加载中...</button>
+        <button class="choice-btn" data-idx="1">② 加载中...</button>
+        <button class="choice-btn" data-idx="2">③ 加载中...</button>
+      </div>
+      <div class="free-input-row">
+        <input type="text" class="input free-input" id="free-input" placeholder="自定义行动..." disabled>
+        <button class="btn-send" id="btn-send" disabled>➤</button>
+      </div>
+    </div>
+
+    <div class="play-status" id="play-status">
+      <span class="status-realm" id="status-realm">凡体期</span>
+      <span class="status-sep">·</span>
+      <span class="status-state" id="status-state">轻伤</span>
+      <span class="status-sep">·</span>
+      <span class="status-location" id="status-location">锈铁棺</span>
+      <button class="status-toggle" id="status-toggle">▲</button>
+    </div>
+  </div>
+
+  <!-- ===== MENU OVERLAY ===== -->
+  <div id="menu-overlay" class="overlay" style="display:none">
+    <div class="overlay-bg" id="menu-bg"></div>
+    <div class="overlay-panel">
+      <h3>≡ 菜单</h3>
+      <button class="btn overlay-btn" id="menu-save">💾 保存</button>
+      <button class="btn overlay-btn" id="menu-load">📂 读取</button>
+      <button class="btn overlay-btn" id="menu-outline">📖 故事大纲</button>
+      <button class="btn overlay-btn" id="menu-status">📊 角色状态</button>
+      <button class="btn overlay-btn" id="menu-settings">⚙ 设置</button>
+      <button class="btn overlay-btn btn-danger" id="menu-quit">🚪 返回标题</button>
+      <button class="btn overlay-btn" id="menu-close">关闭</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="js/starfield.js"></script>
+<script src="js/store.js"></script>
+<script src="js/dice.js"></script>
+<script src="js/pacing.js"></script>
+<script src="js/llm.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
