@@ -94,8 +94,6 @@ ${summary}
   /* ---- 生成故事推进 ---- */
   async generateStory(pacingXml, worldBibleSummary, history, playerChoiceText, config, tropeHint) {
     const personality = this._extract(worldBibleSummary, '性格');
-
-    const personality = this._extract(worldBibleSummary, '性格');
     const genre = this._extract(worldBibleSummary, '流派');
     const theme = this._extract(worldBibleSummary, '叙事主题');
 
