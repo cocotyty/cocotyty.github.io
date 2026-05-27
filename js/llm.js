@@ -38,10 +38,18 @@ const LLM = {
 
   /* ---- 生成序幕 ---- */
   async generatePrologue(worldBibleXml, summary, config) {
+    const genre = this._extract(summary, '流派');
+    const theme = this._extract(summary, '叙事主题');
+    const personality = this._extract(summary, '性格');
+
     const systemPrompt = `你是《星穹编年史》的游戏主持人。这是一个第三人称叙事冒险游戏。
 
+流派: ${genre}
+主题: ${theme}
+叙事基调：根据流派和主题调整风格——讽刺题材则犀利荒诞，热血题材则激昂向上，人性题材则深沉思辨，悬疑题材则层层递进。
+
 用第三人称有限视角（跟随主角，不写他人内心）写出开篇故事。
-主角当前失忆，性格底色${this._extract(summary, '性格')}。
+主角当前失忆，性格底色${personality}。
 主角的缺陷是：${this._extract(summary, '缺陷')}。
 语言有文学感，精炼不啰嗦，善用感官描写（视觉/听觉/触觉）。
 不要在此揭示核心真相，只埋线索。
@@ -87,14 +95,36 @@ ${summary}
   async generateStory(pacingXml, worldBibleSummary, history, playerChoiceText, config, tropeHint) {
     const personality = this._extract(worldBibleSummary, '性格');
 
+    const personality = this._extract(worldBibleSummary, '性格');
+    const genre = this._extract(worldBibleSummary, '流派');
+    const theme = this._extract(worldBibleSummary, '叙事主题');
+
+    const toneGuide = {
+      '讽刺现实': '用荒诞和反讽的笔法，揭露社会现实与人性的荒诞。对话犀利，情节暗藏机锋。',
+      '黑色幽默': '以幽默对抗绝望，笑中带泪。世界是荒诞的，但主角在其中寻找意义。',
+      '人性拷问': '将角色置于道德困境中，逼问「如果是你，会怎么选」。没有简单的对错。',
+      '道德困境': '每一个选择都有代价。善与恶的界限模糊不清。',
+      '黑暗丛林': '世界残酷而真实。善不一定有善报，但主角有自己的底线。',
+      '热血王道': '积极向上，永不言弃。用努力和信念打破宿命。友情、努力、胜利。',
+      '轻松日常': '温馨治愈，节奏舒缓。即使身处绝境，也能找到微小的美好。',
+      '治愈人心': '聚焦人与人之间的温暖联结。希望是暗夜中的星光。'
+    };
+
+    const tone = toneGuide[theme] || '根据世界设定和剧情推进自然写作。如果涉及社会议题，可以用温和的讽刺和思辨，但不要让说教压过故事。';
+
     const systemPrompt = `你是《星穹编年史》的游戏主持人。
+
+叙事风格参考：
+- 核心流派: ${genre}
+- 主题: ${theme}
+- 叙事指南: ${tone}
 
 规则：
 1. 用第三人称有限视角（跟随主角，不写他人内心）
 2. 根据玩家的选择推进剧情
 3. 每次输出2-5段叙事，篇幅精炼
 4. 主角性格底色是${personality}，保持性格一致
-5. 语言有文学感，善用感官描写，精炼不啰嗦
+5. 语言有文学感，善用感官描写
 6. 不要替主角做决定，不要写主角的内心结论
 7. 用中文写作`;
 
