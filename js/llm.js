@@ -22,7 +22,7 @@ const LLM = {
         model: model,
         messages: messages,
         temperature: config.temperature || 0.9,
-        max_tokens: 2048,
+        max_tokens: 32768,
         stream: false
       })
     });
@@ -51,7 +51,7 @@ const LLM = {
 用第三人称有限视角（跟随主角，不写他人内心）写出开篇故事。
 主角当前失忆，性格底色${personality}。
 主角的缺陷是：${this._extract(summary, '缺陷')}。
-语言有文学感，精炼不啰嗦，善用感官描写（视觉/听觉/触觉）。
+语言有文学感，善用感官描写（视觉/听觉/触觉/嗅觉）。
 不要在此揭示核心真相，只埋线索。
 开篇场景：${this._extract(summary, '开场')}
 开场状态：${this._extract(summary, '状态')}
@@ -67,7 +67,10 @@ ${summary}
 要求：
 - 从主角在"${this._extract(summary, '开场')}"中苏醒开始写
 - 展示失忆状态、环境氛围、紧迫感
-- 约5-8段，用中文，第三人称"他"
+- 约8-12段，用中文，第三人称"他"
+- 每段应有实质性的场景推进或信息揭示，不要停留在同一状态打转
+- 充分描写环境细节、感官体验、主角的身体反应
+- 至少引入一个NPC或关键物品的线索
 - 保持悬疑感，不要揭示核心真相
 
 输出格式（只输出XML，不要其他内容）：
@@ -119,12 +122,14 @@ ${summary}
 
 规则：
 1. 用第三人称有限视角（跟随主角，不写他人内心）
-2. 根据玩家的选择推进剧情
-3. 每次输出2-5段叙事，篇幅精炼
+2. 根据玩家的选择推进剧情，每次回应必须让故事有明显的实质推进
+3. 每次输出4-8段叙事，充分展开场景、对话和动作
 4. 主角性格底色是${personality}，保持性格一致
-5. 语言有文学感，善用感官描写
+5. 语言有文学感，善用感官描写，注重环境氛围和细节刻画
 6. 不要替主角做决定，不要写主角的内心结论
-7. 用中文写作`;
+7. 用中文写作
+8. 每次叙事应包含：场景转换或新信息揭示、至少一段对话或互动、明确的事件进展
+9. 避免原地踏步，玩家做出选择后必须看到选择的后果和新局面`;
 
     let tropeSection = '';
     if (tropeHint) {
@@ -150,8 +155,15 @@ ${playerChoiceText}
 </player_action>
 
 <task>
-续写故事。然后提供3个不同的选项，让玩家选择下一步行动。
+续写故事，充分展开剧情。然后提供3个不同的选项，让玩家选择下一步行动。
 每个选项应当是不同的方向（探索/战斗/社交/智取等），不要三个选项都类似。
+
+写作要求：
+- 必须对玩家的选择做出充分回应，展示选择带来的直接后果
+- 推进剧情发展，揭示新信息、新场景或新角色
+- 包含至少一段对话或NPC互动
+- 用感官描写营造氛围，不要只概述事件经过
+- 4-8段，每段有实质内容，不要注水也不要过于简略
 
 输出格式（只输出XML，不要其他内容）：
 <response>
@@ -252,9 +264,9 @@ ${playerChoiceText}
 
   _getHistorySummary(history) {
     if (!history || history.length === 0) return '尚无历史记录。';
-    const recent = history.slice(-3);
+    const recent = history.slice(-5);
     return recent.map((h, i) =>
-      `[第${h.turn}轮]\n${this._stripXmlTags(h.content).substring(0, 150)}`
+      `[第${h.turn}轮]\n${this._stripXmlTags(h.content).substring(0, 300)}`
     ).join('\n\n');
   },
 

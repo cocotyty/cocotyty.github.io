@@ -210,8 +210,8 @@ ${worldBibleSummary}
   /* ---- 获取历史摘要 ---- */
   getHistorySummary(history) {
     if (!history || history.length === 0) return '尚无历史记录。';
-    const recent = history.slice(-3);
-    const lines = recent.map((h, i) => `[第${h.turn}轮] ${h.content.substring(0, 80)}...`);
+    const recent = history.slice(-5);
+    const lines = recent.map((h, i) => `[第${h.turn}轮] ${h.content.substring(0, 150)}...`);
     return lines.join('\n');
   },
 
@@ -230,12 +230,14 @@ ${worldBibleSummary}
 
 规则：
 1. 用第三人称有限视角（跟随主角，不写他人内心）
-2. 根据玩家的选择推进剧情
-3. 每次输出2-5段叙事，篇幅精炼
+2. 根据玩家的选择推进剧情，每次回应必须让故事有明显的实质推进
+3. 每次输出4-8段叙事，充分展开场景、对话和动作
 4. 主角性格底色是${this._getPersonalityFromBible(worldBibleSummary)}，保持性格一致
-5. 语言有文学感，善用感官描写，精炼不啰嗦
+5. 语言有文学感，善用感官描写，注重环境氛围和细节刻画
 6. 不要替主角做决定，不要写主角的内心结论
 7. 用中文写作
+8. 每次叙事应包含：场景转换或新信息揭示、至少一段对话或互动、明确的事件进展
+9. 避免原地踏步，玩家做出选择后必须看到选择的后果和新局面
 </system>
 
 <world_bible_summary>
