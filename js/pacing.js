@@ -1,17 +1,53 @@
 /* =============================================
    星穹编年史 · 节奏控制 (Pacing Manager)
+   四层架构: 故事契约 → 册(卷) → 章 → 节拍
    ============================================= */
 
 const Pacing = {
-  outline: null,
+  /* ---- 旧字段（章/节拍层，保持兼容） ---- */
   currentAct: 1,
   currentChapter: 1,
   currentBeat: 1,
   totalBeats: 4,
   turnInChapter: 0,
   totalTurns: 0,
+  genre: null,
+  outline: null,
 
-  /* ---- 节拍类型轮换 ---- */
+  /* ---- 新字段：故事契约层 ---- */
+  storyContract: null,
+  // { centralQuestion, coreConflict, characterArc, coreCharacters }
+
+  /* ---- 新字段：册层 ---- */
+  currentVolume: 1,
+  totalVolumes: 3,
+  volumeOutline: null,
+  // { name, conflict, sandbox, characterArcStage, chapters: [...] }
+
+  /* ---- 新字段：持久层（跨册携带） ---- */
+  persistentState: null,
+  // { characterGrowth:[], relationships:[], revealedTruths:[], hangingThreads:[] }
+
+  /* ---- 新字段：册内后果账本 ---- */
+  consequenceLedger: [],
+  // [{ turn, event, consequence }]
+
+  /* ---- 册名表 ---- */
+  volumeNames: {
+    default: ['凡尘卷', '问道卷', '终章卷'],
+    '仙侠·修真问道': ['凡尘卷', '问道卷', '飞升卷'],
+    '高武·破碎虚空': ['初露卷', '争锋卷', '破碎卷'],
+    '都市·异能暗流': ['觉醒卷', '暗战卷', '黎明卷'],
+    '末世·废土求生': ['求生卷', '探索卷', '重建卷'],
+    '诡异·复苏纪元': ['异变卷', '深渊卷', '封印卷'],
+    '玄幻·诸天万界': ['初临卷', '争锋卷', '归一卷'],
+    '无限·诸天穿梭': ['轮回卷', '试炼卷', '超越卷'],
+    '克系·不可名状': ['低语卷', '深渊卷', '虚空卷']
+  },
+
+  /* ========================================
+     节拍类型 (章内节奏)
+     ======================================== */
   beatTypes: {
     4: ['introduce', 'build', 'climax', 'resolve'],
     5: ['introduce', 'build', 'twist', 'climax', 'resolve']
@@ -33,26 +69,45 @@ const Pacing = {
     'resolve': '问题解决，收束线索，提供过渡到下一场景的桥梁'
   },
 
-  chapterNames: [
-    '序幕',
-    '铁棺苏醒',
-    '碎星镇',
-    '暗流涌动',
-    '寂静边境',
-    '血祭星穹',
-    '镜面彼方',
-    '超越之价'
-  ],
+  /* ========================================
+     章名表 (每册内复用)
+     ======================================== */
+  genreChapterNames: {
+    default: ['序幕', '初始之地', '暗流涌动', '转折之刻', '终局之前'],
+    '仙侠·修真问道': ['序幕', '凡尘之始', '仙门试炼', '道心蒙尘', '飞升之劫'],
+    '高武·破碎虚空': ['序幕', '初入江湖', '风波渐起', '武林暗流', '破碎虚空'],
+    '都市·异能暗流': ['序幕', '平凡日常', '暗流涌动', '危机逼近', '黎明之前'],
+    '末世·废土求生': ['序幕', '废土初醒', '危机四伏', '深渊裂隙', '新生之路'],
+    '诡异·复苏纪元': ['序幕', '异变初现', '诡事频发', '迷雾重重', '黎明曙光'],
+    '玄幻·诸天万界': ['序幕', '苏醒之地', '势力暗涌', '秘境深处', '混沌终章'],
+    '无限·诸天穿梭': ['序幕', '新手世界', '规则初现', '幕后黑手', '突破轮回'],
+    '克系·不可名状': ['序幕', '异常初显', '理智边缘', '低语渐强', '虚空彼岸']
+  },
 
-  actNames: [
-    '',
-    '失忆者的漂流',    // Act 1: Ch 1-3
-    '通往深渊之路',    // Act 2: Ch 4-6
-    '门之两侧'         // Act 3: Ch 7
-  ],
+  /* ========================================
+     初始化
+     ======================================== */
+  init(savedState, genre) {
+    this.currentAct = 1;
+    this.currentChapter = 1;
+    this.currentBeat = 1;
+    this.totalBeats = 4;
+    this.turnInChapter = 0;
+    this.totalTurns = 0;
+    this.outline = null;
+    this.genre = null;
+    this.storyContract = null;
+    this.currentVolume = 1;
+    this.totalVolumes = 3;
+    this.volumeOutline = null;
+    this.persistentState = {
+      characterGrowth: [],
+      relationships: [],
+      revealedTruths: [],
+      hangingThreads: []
+    };
+    this.consequenceLedger = [];
 
-  /* ---- 初始化 ---- */
-  init(savedState) {
     if (savedState) {
       this.currentAct = savedState.currentAct || 1;
       this.currentChapter = savedState.currentChapter || 1;
@@ -61,6 +116,16 @@ const Pacing = {
       this.turnInChapter = savedState.turnInChapter || 0;
       this.totalTurns = savedState.totalTurns || 0;
       this.outline = savedState.outline || null;
+      this.genre = savedState.genre || null;
+      this.storyContract = savedState.storyContract || null;
+      this.currentVolume = savedState.currentVolume || 1;
+      this.totalVolumes = savedState.totalVolumes || 3;
+      this.volumeOutline = savedState.volumeOutline || null;
+      this.persistentState = savedState.persistentState || this.persistentState;
+      this.consequenceLedger = savedState.consequenceLedger || [];
+    }
+    if (genre) {
+      this.genre = genre;
     }
   },
 
@@ -72,19 +137,37 @@ const Pacing = {
       totalBeats: this.totalBeats,
       turnInChapter: this.turnInChapter,
       totalTurns: this.totalTurns,
-      outline: this.outline
+      outline: this.outline,
+      genre: this.genre,
+      storyContract: this.storyContract,
+      currentVolume: this.currentVolume,
+      totalVolumes: this.totalVolumes,
+      volumeOutline: this.volumeOutline,
+      persistentState: this.persistentState,
+      consequenceLedger: this.consequenceLedger
     };
   },
 
-  /* ---- 获取当前信息 ---- */
+  /* ========================================
+     获取当前信息
+     ======================================== */
+  _genreNames(tables, fallbackIdx) {
+    if (!this.genre) return tables.default[fallbackIdx] || `第${fallbackIdx}章`;
+    return (tables[this.genre] || tables.default)[fallbackIdx] || `第${fallbackIdx}章`;
+  },
+
   getChapterName() {
-    return this.chapterNames[this.currentChapter] || `第${this.currentChapter}章`;
+    const chInVolume = ((this.currentChapter - 1) % 4) + 1;
+    return this._genreNames(this.genreChapterNames, chInVolume);
+  },
+
+  getVolumeName() {
+    const table = this.genre ? (this.volumeNames[this.genre] || this.volumeNames.default) : this.volumeNames.default;
+    return table[this.currentVolume - 1] || `第${this.currentVolume}册`;
   },
 
   getActName() {
-    if (this.currentChapter <= 3) return this.actNames[1];
-    if (this.currentChapter <= 6) return this.actNames[2];
-    return this.actNames[3];
+    return this.getVolumeName();
   },
 
   getBeatType() {
@@ -97,20 +180,102 @@ const Pacing = {
   },
 
   getBeatGoal() {
+    if (this.volumeOutline) {
+      const chInVolume = ((this.currentChapter - 1) % 4);
+      const ch = this.volumeOutline.chapters[chInVolume];
+      if (ch && ch.beats) {
+        const beat = ch.beats[this.currentBeat - 1];
+        if (beat && beat.intent) return beat.intent;
+      }
+    }
     return this.beatGoals[this.getBeatType()] || '推进剧情';
   },
 
+  /* ========================================
+     XML 输出 (注入 prompt)
+     ======================================== */
   getPacingXml() {
     return `<pacing>
-  <act>第${this.currentAct}幕 · ${this.getActName()}</act>
+  <volume>第${this.currentVolume}册 · ${this.getVolumeName()} (${this.currentVolume}/${this.totalVolumes})</volume>
   <chapter>第${this.currentChapter}章 · ${this.getChapterName()}</chapter>
   <beat number="${this.currentBeat}/${this.totalBeats}" type="${this.getBeatType()}">${this.getBeatName()}</beat>
   <beat_goal>${this.getBeatGoal()}</beat_goal>
   <chapter_progress>第${this.turnInChapter}轮，预期5-8轮完成本章</chapter_progress>
+  <genre>${this.genre || '通用'}</genre>
 </pacing>`;
   },
 
-  /* ---- 推进 ---- */
+  getStoryContractXml() {
+    if (!this.storyContract) return '';
+    const c = this.storyContract;
+    let chars = '';
+    if (c.coreCharacters) {
+      chars = '\n  <core_characters>\n' +
+        c.coreCharacters.map(ch =>
+          `    <character name="${ch.name}" role="${ch.role}" relationship="${ch.relationship}" arc="${ch.arcDirection}" />`
+        ).join('\n') + '\n  </core_characters>';
+    }
+    return `<story_contract>
+  <central_question>${c.centralQuestion}</central_question>
+  <core_conflict>${c.coreConflict}</core_conflict>
+  <character_arc start="${c.characterArc.start}" end="${c.characterArc.end}" />${chars}
+</story_contract>`;
+  },
+
+  getVolumeXml() {
+    if (!this.volumeOutline) return '';
+    const v = this.volumeOutline;
+    let chXml = '';
+    if (v.chapters) {
+      chXml = '\n  <chapters>\n' +
+        v.chapters.map(ch =>
+          `    <chapter num="${ch.number}" theme="${ch.theme || ''}" />`
+        ).join('\n') + '\n  </chapters>';
+    }
+    return `<volume number="${this.currentVolume}/${this.totalVolumes}" name="${v.name || this.getVolumeName()}">
+  <conflict>${v.conflict}</conflict>
+  <character_arc_stage>${v.characterArcStage}</character_arc_stage>
+  <sandbox>${v.sandbox || ''}</sandbox>${chXml}
+</volume>`;
+  },
+
+  getPersistentXml() {
+    if (!this.persistentState) return '';
+    const p = this.persistentState;
+    let xml = '<persistent_state>';
+    if (p.characterGrowth && p.characterGrowth.length > 0) {
+      xml += '\n  <growth>\n' +
+        p.characterGrowth.map(g => `    <item>${g}</item>`).join('\n') + '\n  </growth>';
+    }
+    if (p.relationships && p.relationships.length > 0) {
+      xml += '\n  <relationships>\n' +
+        p.relationships.map(r =>
+          `    <relation name="${r.name}" type="${r.type}" attitude="${r.attitude}" />`
+        ).join('\n') + '\n  </relationships>';
+    }
+    if (p.revealedTruths && p.revealedTruths.length > 0) {
+      xml += '\n  <truths>\n' +
+        p.revealedTruths.map(t => `    <truth>${t}</truth>`).join('\n') + '\n  </truths>';
+    }
+    if (p.hangingThreads && p.hangingThreads.length > 0) {
+      xml += '\n  <hanging_threads>\n' +
+        p.hangingThreads.map(h => `    <thread>${h}</thread>`).join('\n') + '\n  </hanging_threads>';
+    }
+    xml += '\n</persistent_state>';
+    return xml;
+  },
+
+  getConsequenceXml() {
+    if (!this.consequenceLedger || this.consequenceLedger.length === 0) return '';
+    const recent = this.consequenceLedger.slice(-10);
+    return '<consequences>\n' +
+      recent.map(c => `  <event turn="${c.turn}">${c.event} → ${c.consequence}</event>`).join('\n') +
+      '\n</consequences>';
+  },
+
+  /* ========================================
+     推进逻辑
+     ======================================== */
   recordTurn() {
     this.turnInChapter++;
     this.totalTurns++;
@@ -129,153 +294,70 @@ const Pacing = {
     this.currentBeat = 1;
     this.turnInChapter = 0;
     this.totalBeats = this.currentChapter === 7 ? 5 : 4;
-    if (this.currentChapter === 4) this.currentAct = 2;
-    if (this.currentChapter === 7) this.currentAct = 3;
-    return this.currentChapter <= 7 ? 'continue' : 'game_complete';
+
+    const chaptersPerVolume = this.volumeOutline?.chapters?.length || 4;
+    const totalChapters = this.currentVolume * chaptersPerVolume;
+    if (this.currentChapter > totalChapters) {
+      return 'volume_complete';
+    }
+
+    if (this.currentVolume === this.totalVolumes &&
+        this.currentChapter > this.totalVolumes * chaptersPerVolume) {
+      return 'game_complete';
+    }
+
+    return 'continue';
   },
 
-  /* ---- 生成故事大纲提示 ---- */
-  getOutlinePrompt(worldBibleSummary) {
-    return `<system>
-你是《星穹编年史》的游戏大纲设计师。
-根据以下世界设定，生成一个3幕7章的故事大纲。
-每章包含4-5个节拍（introduce/build/climax/resolve或introduce/build/twist/climax/resolve）。
-用XML格式输出。
-</system>
-
-<world_setting>
-${worldBibleSummary}
-</world_setting>
-
-<task>
-输出格式：
-<story_outline>
-  <act number="1" name="..." expected_turns="15-20">
-    <chapter number="1" name="..." theme="..." turns="5-8" beat_count="4">
-      <beat number="1" type="introduce" intent="..." />
-      <beat number="2" type="build" intent="..." />
-      <beat number="3" type="climax" intent="..." />
-      <beat number="4" type="resolve" intent="..." />
-    </chapter>
-    <!-- 第2章、第3章 -->
-  </act>
-  <!-- 第2幕、第3幕 -->
-</story_outline>
-
-注意：只输出XML，不要其他内容。
-</task>`;
+  advanceVolume() {
+    this.consequenceLedger = [];
+    this.currentVolume++;
+    this.currentBeat = 1;
+    this.turnInChapter = 0;
+    if (this.currentVolume > this.totalVolumes) {
+      return 'game_complete';
+    }
+    return 'continue';
   },
 
-  parseOutline(xmlText) {
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(xmlText, 'text/xml');
-      const acts = [];
-      doc.querySelectorAll('act').forEach(actEl => {
-        const act = {
-          number: parseInt(actEl.getAttribute('number')),
-          name: actEl.getAttribute('name'),
-          expectedTurns: actEl.getAttribute('expected_turns'),
-          chapters: []
-        };
-        actEl.querySelectorAll('chapter').forEach(chEl => {
-          const ch = {
-            number: parseInt(chEl.getAttribute('number')),
-            name: chEl.getAttribute('name'),
-            theme: chEl.getAttribute('theme'),
-            turns: chEl.getAttribute('turns'),
-            beatCount: parseInt(chEl.getAttribute('beat_count') || '4'),
-            beats: []
-          };
-          chEl.querySelectorAll('beat').forEach(bEl => {
-            ch.beats.push({
-              number: parseInt(bEl.getAttribute('number')),
-              type: bEl.getAttribute('type'),
-              intent: bEl.textContent.trim()
-            });
-          });
-          act.chapters.push(ch);
-        });
-        acts.push(act);
-      });
-      this.outline = acts;
-      return acts;
-    } catch (e) {
-      console.warn('Failed to parse outline:', e);
-      this.outline = null;
-      return null;
+  addConsequence(event, consequence) {
+    this.consequenceLedger.push({
+      turn: this.totalTurns,
+      event: event,
+      consequence: consequence
+    });
+  },
+
+  addCharacterGrowth(item) {
+    if (!this.persistentState.characterGrowth) this.persistentState.characterGrowth = [];
+    this.persistentState.characterGrowth.push(item);
+  },
+
+  addRelationship(name, type, attitude) {
+    if (!this.persistentState.relationships) this.persistentState.relationships = [];
+    const existing = this.persistentState.relationships.find(r => r.name === name);
+    if (existing) {
+      existing.attitude = attitude;
+    } else {
+      this.persistentState.relationships.push({ name, type, attitude });
     }
   },
 
-  /* ---- 获取历史摘要 ---- */
-  getHistorySummary(history) {
-    if (!history || history.length === 0) return '尚无历史记录。';
-    const recent = history.slice(-5);
-    const lines = recent.map((h, i) => `[第${h.turn}轮] ${h.content.substring(0, 150)}...`);
-    return lines.join('\n');
+  addRevealedTruth(truth) {
+    if (!this.persistentState.revealedTruths) this.persistentState.revealedTruths = [];
+    this.persistentState.revealedTruths.push(truth);
   },
 
-  /* ---- 构建主循环prompt ---- */
-  buildStoryPrompt(worldBibleSummary, history, playerChoiceText, tropeHint) {
-    const historySummary = this.getHistorySummary(history);
-    const pacXml = this.getPacingXml();
-
-    let tropeXml = '';
-    if (tropeHint) {
-      tropeXml = `<trope_hint>${tropeHint}</trope_hint>`;
-    }
-
-    return `<system>
-你是《星穹编年史》的游戏主持人。
-
-规则：
-1. 用第三人称有限视角（跟随主角，不写他人内心）
-2. 根据玩家的选择推进剧情，每次回应必须让故事有明显的实质推进
-3. 每次输出4-8段叙事，充分展开场景、对话和动作
-4. 主角性格底色是${this._getPersonalityFromBible(worldBibleSummary)}，保持性格一致
-5. 语言有文学感，善用感官描写，注重环境氛围和细节刻画
-6. 不要替主角做决定，不要写主角的内心结论
-7. 用中文写作
-8. 每次叙事应包含：场景转换或新信息揭示、至少一段对话或互动、明确的事件进展
-9. 避免原地踏步，玩家做出选择后必须看到选择的后果和新局面
-</system>
-
-<world_bible_summary>
-${worldBibleSummary}
-</world_bible_summary>
-
-${pacXml}
-
-${tropeXml}
-
-<recent_history>
-${historySummary}
-</recent_history>
-
-<player_action>
-${playerChoiceText}
-</player_action>
-
-<task>
-续写故事。然后提供3个不同的选项，让玩家选择下一步行动。
-每个选项应当是不同的方向（探索/战斗/社交/智取等），不要三个选项都类似。
-
-输出格式（只输出XML，不要其他内容）：
-<response>
-  <narrative>
-故事正文，支持markdown格式
-  </narrative>
-  <choices>
-    <choice>第一个选项，以动词开头</choice>
-    <choice>第二个选项，以动词开头</choice>
-    <choice>第三个选项，以动词开头</choice>
-  </choices>
-</response>
-</task>`;
+  addHangingThread(thread) {
+    if (!this.persistentState.hangingThreads) this.persistentState.hangingThreads = [];
+    this.persistentState.hangingThreads.push(thread);
   },
 
+  /* ========================================
+     旧版兼容方法 (buildStoryPrompt)
+     ======================================== */
   _getPersonalityFromBible(summary) {
-    const match = summary.match(/性格:?\s*(\S+)/);
-    return match ? match[1] : '冷静';
+    const match = summary.match(/性格[：:]?\s*(.+?)(?:\s*\||$)/);
+    return match ? match[1].trim() : '冷静';
   }
 };

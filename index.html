@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#0a0a12">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
 <title>星穹编年史</title>
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="css/style.css">
@@ -43,7 +44,7 @@
   <div id="screen-settings" class="screen">
     <div class="screen-inner">
       <div class="settings-header">
-        <button class="btn-back" data-goto="splash">←</button>
+        <button class="btn-back" data-back>←</button>
         <h2>⚙ 设置</h2>
       </div>
       <div class="settings-body">
@@ -95,12 +96,16 @@
   <div id="screen-world-gen" class="screen">
     <div class="screen-inner">
       <div class="settings-header">
-        <button class="btn-back" data-goto="splash">←</button>
+        <button class="btn-back" data-back>←</button>
         <h2>✦ 掷骰定世</h2>
       </div>
       <div id="dice-container" class="dice-container">
         <p class="dice-placeholder">命运的骰子尚未掷出...</p>
         <p class="dice-hint">（骰子系统将在 Phase 2 实现）</p>
+      </div>
+      <div id="style-selector" class="style-selector" style="display:none">
+        <h3 class="style-selector-title">🖋️ 写作风格</h3>
+        <div id="style-cards" class="style-cards"></div>
       </div>
       <div class="dice-actions">
         <button class="btn btn-primary" id="btn-confirm-world" disabled>
@@ -122,6 +127,10 @@
         <input type="text" class="input" id="edit-world-name" placeholder="输入世界名称">
       </div>
       <div id="edit-dice-container" class="dice-container"></div>
+      <div id="edit-style-selector" class="style-selector" style="display:none">
+        <h3 class="style-selector-title">🖋️ 写作风格</h3>
+        <div id="edit-style-cards" class="style-cards"></div>
+      </div>
       <div class="dice-actions" style="display:flex;flex-direction:column;gap:8px">
         <button class="btn btn-primary" id="btn-edit-save">保存修改</button>
         <button class="btn btn-danger" id="btn-edit-delete">🗑 删除此世界</button>
@@ -137,7 +146,7 @@
       <p class="confirm-sub" style="text-align:center;margin-bottom:16px">需要 API Key 才能生成故事</p>
       <label class="field" style="margin-bottom:12px">
         <span class="field-label">API Key</span>
-        <input type="password" class="input" id="prompt-api-key" placeholder="sk-..." autocomplete="off">
+        <form style="display:flex;flex-direction:column;gap:6px" autocomplete="off"><input type="password" class="input" id="prompt-api-key" placeholder="sk-..." autocomplete="off"></form>
       </label>
       <label class="field" style="margin-bottom:8px">
         <span class="field-label">API 端点</span>
@@ -196,36 +205,22 @@
       <div class="story-beat" id="story-beat"></div>
     </div>
 
-    <!-- ===== REASONING OVERLAY ===== -->
-    <div id="reasoning-overlay" class="reasoning-overlay" style="display:none">
-      <div class="reasoning-bg"></div>
-      <div class="reasoning-content">
-        <div class="reasoning-constellation">
-          <span class="c-star s1">✦</span>
-          <span class="c-star s2">✦</span>
-          <span class="c-star s3">✦</span>
-          <span class="c-star s4">✦</span>
-          <span class="c-star s5">✦</span>
-          <span class="c-glow"></span>
+    <div class="play-input-area" id="play-input-area" style="display:none">
+      <div class="thinking-bar" id="thinking-bar" style="display:none">
+        <div class="thinking-bar-track">
+          <div class="thinking-bar-fill"></div>
         </div>
-        <div class="reasoning-text">
+        <div class="thinking-bar-text">
           <span class="reasoning-msg" id="reasoning-msg">星穹推演中</span>
           <span class="reasoning-dots"><span>.</span><span>.</span><span>.</span></span>
         </div>
-        <div class="reasoning-sub" id="reasoning-sub">群星正在排列</div>
-        <div class="reasoning-elapsed" id="reasoning-elapsed"></div>
-      </div>
-    </div>
-
-    <div class="play-input-area" id="play-input-area" style="display:none">
-      <div class="choices" id="choices-container">
-        <button class="choice-btn" data-idx="0">① 加载中...</button>
-        <button class="choice-btn" data-idx="1">② 加载中...</button>
-        <button class="choice-btn" data-idx="2">③ 加载中...</button>
+        <div class="thinking-bar-sub" id="reasoning-sub">群星正在排列</div>
+        <div class="thinking-bar-elapsed" id="reasoning-elapsed"></div>
       </div>
       <div class="free-input-row">
-        <input type="text" class="input free-input" id="free-input" placeholder="自定义行动..." disabled>
-        <button class="btn-send" id="btn-send" disabled>➤</button>
+        <button class="btn-continue" id="btn-continue">继续 ▶</button>
+        <button class="btn-secondary" id="btn-regenerate">↺</button>
+        <input type="text" class="input free-input" id="free-input" placeholder="自定义行动..." autocomplete="off">
       </div>
     </div>
 
@@ -235,6 +230,8 @@
       <span class="status-state" id="status-state">轻伤</span>
       <span class="status-sep">·</span>
       <span class="status-location" id="status-location">锈铁棺</span>
+      <span class="status-sep">·</span>
+      <span class="status-stats" id="token-stats"></span>
       <button class="status-toggle" id="status-toggle">▲</button>
     </div>
   </div>
@@ -244,13 +241,37 @@
     <div class="overlay-bg" id="menu-bg"></div>
     <div class="overlay-panel">
       <h3>≡ 菜单</h3>
-      <button class="btn overlay-btn" id="menu-save">💾 保存</button>
-      <button class="btn overlay-btn" id="menu-load">📂 读取</button>
       <button class="btn overlay-btn" id="menu-outline">📖 故事大纲</button>
-      <button class="btn overlay-btn" id="menu-status">📊 角色状态</button>
+      <button class="btn overlay-btn" id="menu-world">🌍 世界设定</button>
+      <button class="btn overlay-btn" id="menu-stats">📊 Token 统计</button>
+      <button class="btn overlay-btn" id="menu-status">👤 角色状态</button>
       <button class="btn overlay-btn" id="menu-settings">⚙ 设置</button>
       <button class="btn overlay-btn btn-danger" id="menu-quit">🚪 返回标题</button>
       <button class="btn overlay-btn" id="menu-close">关闭</button>
+    </div>
+  </div>
+
+  <!-- ===== WORLD INFO PANEL ===== -->
+  <div id="world-info-overlay" class="overlay" style="display:none">
+    <div class="overlay-bg" id="world-info-bg"></div>
+    <div class="world-info-panel">
+      <div class="world-info-header">
+        <h3>🌍 世界设定</h3>
+        <button class="btn-back" id="world-info-close">✕</button>
+      </div>
+      <div class="world-info-body" id="world-info-body"></div>
+    </div>
+  </div>
+
+  <!-- ===== STATS PANEL ===== -->
+  <div id="stats-overlay" class="overlay" style="display:none">
+    <div class="overlay-bg" id="stats-bg"></div>
+    <div class="world-info-panel">
+      <div class="world-info-header">
+        <h3>📊 Token 统计</h3>
+        <button class="btn-back" id="stats-close">✕</button>
+      </div>
+      <div class="world-info-body" id="stats-body"></div>
     </div>
   </div>
 
@@ -261,6 +282,9 @@
 <script src="js/store.js"></script>
 <script src="js/dice.js"></script>
 <script src="js/pacing.js"></script>
+<script src="js/message-store.js"></script>
+<script src="js/token-stats.js"></script>
+<script src="js/writing-styles.js"></script>
 <script src="js/llm.js"></script>
 <script src="js/app.js"></script>
 </body>

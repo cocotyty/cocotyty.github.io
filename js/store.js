@@ -192,7 +192,7 @@ const Store = {
   getDebugPreset() {
     return {
       meta: {
-        name: '预设世界·星海帝国',
+        name: '预设世界·万界交汇',
         saveId: 'DEBUG-' + Date.now(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -205,42 +205,43 @@ const Store = {
   <meta_rules>
     <fundamental_law>混搭——科学与修真共存</fundamental_law>
     <time_flow>线性</time_flow>
-    <death_rule>意识转移</death_rule>
-    <space_structure>星系联邦</space_structure>
+    <death_rule>轮回转世</death_rule>
+    <space_structure>多维世界叠层</space_structure>
   </meta_rules>
   <cosmic_setting>
-    <civilization_form>星海帝国</civilization_form>
-    <power_system>灵能 + 修真境界</power_system>
+    <civilization_form>修真联盟·万宗林立</civilization_form>
+    <power_system>修真·炼气化神</power_system>
     <cosmic_atmosphere>大探索时代</cosmic_atmosphere>
-    <core_resource>灵能水晶</core_resource>
+    <core_resource>灵脉灵气</core_resource>
     <primary_threat>上古封印松动</primary_threat>
     <social_structure>实力为尊</social_structure>
   </cosmic_setting>
   <protagonist>
     <name>???</name>
-    <birthright>贵族末裔</birthright>
-    <talent>灵能亲和（封印）</talent>
+    <birthright>散修遗孤</birthright>
+    <talent>剑心通明</talent>
     <personality>冷静</personality>
     <core_desire>追寻真相</core_desire>
     <hidden_identity>穿越者</hidden_identity>
     <flaw>关键记忆封印</flaw>
   </protagonist>
 </world_bible>`,
-      worldSummary: `世界法则: 混搭——科学与修真共存 | 时间: 线性 | 死亡: 意识转移 | 空间: 星系联邦
-文明: 星海帝国 | 力量: 灵能 + 修真境界 | 气氛: 大探索时代
-资源: 灵能水晶 | 威胁: 上古封印松动 | 社会: 实力为尊
-主角出身: 贵族末裔 | 天赋: 灵能亲和（封印） | 性格: 冷静
+      worldSummary: `世界法则: 混搭——科学与修真共存 | 时间: 线性 | 死亡: 轮回转世 | 空间: 多维世界叠层
+文明: 修真联盟·万宗林立 | 力量: 修真·炼气化神 | 气氛: 大探索时代
+资源: 灵脉灵气 | 威胁: 上古封印松动 | 社会: 实力为尊
+主角出身: 散修遗孤 | 天赋: 剑心通明 | 性格: 冷静
 欲望: 追寻真相 | 隐藏身份: 穿越者 | 缺陷: 关键记忆封印
-开场: 逃生舱漂流 | 状态: 被追杀中 | 物品: 家传玉简`,
+流派: 仙侠·修真问道 | 标签: 灵气复苏·万物觉醒 / 热血王道·永不言弃
+开场: 破败古庙的偏殿中 | 状态: 刚刚苏醒·记忆全失 | 物品: 一枚家传的玉佩`,
       state: {
         protagonist: {
-          realm: '凡体期',
-          statusEffects: ['记忆封印', '轻伤'],
-          inventory: ['家传玉简', '标准救生服']
+          realm: '练气期',
+          statusEffects: ['记忆封印'],
+          inventory: ['家传玉佩']
         },
         npcs: {},
         flags: { debugMode: true },
-        currentLocation: '锈铁棺废弃空间站'
+        currentLocation: '破败古庙'
       },
       history: [],
       storyOutline: null

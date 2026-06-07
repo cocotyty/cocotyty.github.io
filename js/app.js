@@ -14,6 +14,8 @@ const App = {
   _reasoningMsgs: [],
   _reasoningSubs: [],
 
+  _skipHash: false,
+
   /* ===== INIT ===== */
   async init() {
     Store.init();
@@ -26,6 +28,8 @@ const App = {
       const preset = Store.getDebugPreset();
       Store.setGame(preset);
       Pacing.init(preset.pacing);
+      const genreMatch = preset.worldSummary.match(/流派[：:]?\s*(.+?)(?:\s*\||$)/);
+      if (genreMatch) Pacing.genre = genreMatch[1].trim();
     }
 
     this._bindNavigation();
@@ -33,11 +37,32 @@ const App = {
     this._bindPlay();
     this._bindMenu();
     this._bindApiPrompt();
+    this._bindStatusToggle();
+    this._bindHashRouting();
     this._restoreScreen();
   },
 
+  /* ===== STATS DISPLAY ===== */
+  _updateStatsDisplay() {
+    const el = document.getElementById('token-stats');
+    if (!el) return;
+    const config = Store.getConfig();
+    const model = config.model || 'deepseek-v4-flash';
+    const totalUsage = MessageStore.totalUsage();
+    el.textContent = TokenStats.formatReportHTML(totalUsage, model);
+  },
+
   /* ===== SCREEN MGMT ===== */
-  showScreen(name) {
+  showScreen(name, pushState) {
+    if (pushState !== false && location.hash.slice(1) !== name) {
+      this._skipHash = true;
+      if (pushState === 'replace') {
+        history.replaceState(null, '', '#' + name);
+      } else {
+        history.pushState(null, '', '#' + name);
+      }
+      this._skipHash = false;
+    }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const el = document.getElementById('screen-' + name);
     if (el) {
@@ -47,6 +72,14 @@ const App = {
     }
     Store.set('screen', name);
     this._onScreenEnter(name);
+  },
+
+  _bindHashRouting() {
+    window.addEventListener('popstate', () => {
+      if (this._skipHash) return;
+      const name = location.hash.slice(1) || 'splash';
+      this.showScreen(name, false);
+    });
   },
 
   _onScreenEnter(name) {
@@ -59,10 +92,16 @@ const App = {
   _restoreScreen() {
     const config = Store.getConfig();
     if (config.debugMode && Store.getGame()) {
-      this.showScreen('play');
+      const game = Store.getGame();
+      if (game.messageStore) {
+        MessageStore.fromState(game.messageStore);
+      } else {
+        MessageStore.reset();
+      }
+      this.showScreen('play', 'replace');
       this._loadPlayContent();
     } else {
-      this.showScreen('splash');
+      this.showScreen('splash', 'replace');
     }
   },
 
@@ -72,12 +111,18 @@ const App = {
       btn.addEventListener('click', () => this.showScreen(btn.dataset.goto));
     });
 
+    document.querySelectorAll('[data-back]').forEach(btn => {
+      btn.addEventListener('click', () => history.back());
+    });
+
     document.getElementById('btn-new-game').addEventListener('click', () => {
       const config = Store.getConfig();
       if (config.debugMode) {
         const preset = Store.getDebugPreset();
         Store.setGame(preset);
         Pacing.init(preset.pacing);
+        const genreMatch = preset.worldSummary.match(/流派[：:]?\s*(.+?)(?:\s*\||$)/);
+        if (genreMatch) Pacing.genre = genreMatch[1].trim();
         this.showScreen('play');
         this._loadPlayContent();
       } else if (!config.apiKey) {
@@ -90,7 +135,7 @@ const App = {
     document.getElementById('btn-confirm-world').addEventListener('click', () => this._confirmWorld());
 
     // Edit screen
-    document.getElementById('btn-edit-back').addEventListener('click', () => this.showScreen('splash'));
+    document.getElementById('btn-edit-back').addEventListener('click', () => history.back());
     document.getElementById('btn-edit-save').addEventListener('click', () => this._saveEditWorld());
     document.getElementById('btn-edit-delete').addEventListener('click', () => this._confirmDeleteWorld());
 
@@ -198,6 +243,14 @@ const App = {
     const game = Store.loadGameBySlot(slot);
     if (game) {
       Pacing.init(game.pacing);
+      if (!Pacing.genre && game.diceResults) {
+        Pacing.genre = DiceSystem._getGenre(game.diceResults);
+      }
+      if (game.messageStore) {
+        MessageStore.fromState(game.messageStore);
+      } else {
+        MessageStore.reset();
+      }
       this.showScreen('play');
       this._loadPlayContent();
     }
@@ -281,6 +334,8 @@ const App = {
       section.appendChild(group);
       container.appendChild(section);
     });
+
+    this._renderEditStyleCards(game.writingStyle || 'default');
   },
 
   _saveEditWorld() {
@@ -318,6 +373,11 @@ const App = {
 
     Store.updateSaveDice(slot, results, worldName);
     Store.loadGameBySlot(slot);
+    var game = Store.getGame();
+    if (game) {
+      game.writingStyle = this._selectedStyle || 'default';
+      Store.saveGame();
+    }
     this._flashMessage('已保存');
     this.showScreen('splash');
   },
@@ -464,6 +524,7 @@ const App = {
   _initDiceScreen() {
     const results = DiceSystem.rollAll();
     this._renderDicePills(results);
+    this._renderStyleCards();
     document.getElementById('btn-confirm-world').disabled = false;
   },
 
@@ -500,15 +561,82 @@ const App = {
     });
   },
 
+  _renderStyleCards() {
+    const container = document.getElementById('style-cards');
+    const selector = document.getElementById('style-selector');
+    container.innerHTML = '';
+    selector.style.display = '';
+
+    this._selectedStyle = 'default';
+
+    WritingStyles.getAll().forEach(function (style) {
+      const card = document.createElement('div');
+      card.className = 'style-card' + (style.id === 'default' ? ' selected' : '');
+      card.dataset.styleId = style.id;
+      card.innerHTML =
+        '<span class="style-card-icon">' + style.icon + '</span>' +
+        '<div class="style-card-name">' + style.name + '</div>' +
+        '<div class="style-card-subtitle">' + style.subtitle + '</div>' +
+        '<div class="style-card-author">' + style.author + '</div>';
+
+      card.addEventListener('click', function () {
+        container.querySelectorAll('.style-card').forEach(function (c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+        this._selectedStyle = style.id;
+      }.bind(this));
+
+      container.appendChild(card);
+    }.bind(this));
+  },
+
+  _renderEditStyleCards(currentStyleId) {
+    var container = document.getElementById('edit-style-cards');
+    var selector = document.getElementById('edit-style-selector');
+    container.innerHTML = '';
+    selector.style.display = '';
+
+    this._selectedStyle = currentStyleId;
+
+    var self = this;
+    WritingStyles.getAll().forEach(function (style) {
+      var card = document.createElement('div');
+      card.className = 'style-card' + (style.id === currentStyleId ? ' selected' : '');
+      card.dataset.styleId = style.id;
+      card.innerHTML =
+        '<span class="style-card-icon">' + style.icon + '</span>' +
+        '<div class="style-card-name">' + style.name + '</div>' +
+        '<div class="style-card-subtitle">' + style.subtitle + '</div>' +
+        '<div class="style-card-author">' + style.author + '</div>';
+
+      card.addEventListener('click', function () {
+        container.querySelectorAll('.style-card').forEach(function (c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+        self._selectedStyle = style.id;
+      });
+
+      container.appendChild(card);
+    });
+  },
+
   _rerollPill(layerId, dieId) {
+    const oldGenre = DiceSystem._getGenre(DiceSystem.getCurrentResults());
     const result = DiceSystem.rerollDie(layerId, dieId);
     if (!result) return;
+    const newGenre = DiceSystem._getGenre(DiceSystem.getCurrentResults());
+    if (oldGenre !== newGenre) {
+      const results = DiceSystem.getCurrentResults();
+      results.forEach(layer => {
+        layer.results.forEach(die => {
+          const pillId = `${layer.layerId}:${die.dieId}`;
+          const pill = document.querySelector(`.pill[data-id="${pillId}"]`);
+          if (pill) pill.querySelector('.pill-value').textContent = die.value;
+        });
+      });
+    }
     const id = `${layerId}:${dieId}`;
     const pill = document.querySelector(`.pill[data-id="${id}"]`);
     if (pill) {
-      pill.querySelector('.pill-value').textContent = result.value;
       pill.classList.remove('pill-flash');
-      // Force reflow
       void pill.offsetWidth;
       pill.classList.add('pill-flash');
     }
@@ -519,6 +647,12 @@ const App = {
     const xml = DiceSystem.generateWorldBibleXml(results);
     const summary = DiceSystem.generateLlmSummary(results);
     const worldName = DiceSystem.generateWorldName(results);
+    const genre = DiceSystem._getGenre(results);
+    const powerFill = genre === '仙侠·修真问道' ? '练气期' :
+      genre === '高武·破碎虚空' ? '淬体境' :
+      genre === '都市·异能暗流' ? '觉醒阶' :
+      genre === '末世·废土求生' ? '生存者' :
+      genre === '诡异·复苏纪元' ? '凡人' : '凡体期';
 
     const game = {
       meta: {
@@ -533,80 +667,118 @@ const App = {
       worldBible: xml,
       worldSummary: summary,
       diceResults: results,
+      writingStyle: this._selectedStyle || 'default',
       pacing: Pacing.getState(),
       state: {
         protagonist: {
-          realm: '凡体期',
-          statusEffects: ['记忆封印', '轻伤'],
-          inventory: ['家传玉简', '标准救生服']
+          realm: powerFill,
+          statusEffects: ['记忆封印'],
+          inventory: ['随身物品']
         },
         npcs: {},
         flags: { created: true },
-        currentLocation: '未知空间'
+        currentLocation: '未知'
       },
       history: []
     };
 
     Store.setGame(game);
-    Pacing.init();
+    Pacing.init(null, genre);
     game.pacing = Pacing.getState();
     Store.saveGame();
 
     this.showScreen('prologue');
-    await this._generatePrologue();
+    await this._generateContractAndPrologue();
   },
 
-  /* ===== PROLOGUE ===== */
-  async _generatePrologue() {
+  /* ===== CONTRACT + VOLUME + PROLOGUE ===== */
+  async _generateContractAndPrologue() {
     const game = Store.getGame();
     const config = Store.getConfig();
 
+    this.showScreen('play');
+    const inputArea = document.getElementById('play-input-area');
+    inputArea.style.display = 'flex';
+    inputArea.classList.add('thinking');
+    this._showThinkingIndicator();
+
     try {
-      const result = await LLM.generatePrologue(game.worldBible, game.worldSummary, config);
+      // Step 1: Story Contract
+      console.log('[App] Generating story contract...');
+      const contractResult = await LLM.generateStoryContract(game.worldBible, game.worldSummary, config);
+      const contract = contractResult.contract;
+      Pacing.storyContract = contract;
+      game.pacing = Pacing.getState();
+      Store.saveGame();
+
+      // Step 2: Volume 1 Outline
+      console.log('[App] Generating volume 1 outline...');
+      const volumeResult = await LLM.generateVolumeOutline(
+        game.worldBible, game.worldSummary, contract,
+        1, Pacing.totalVolumes, Pacing.persistentState, config
+      );
+      Pacing.volumeOutline = volumeResult.outline;
+      game.pacing = Pacing.getState();
+      Store.saveGame();
+
+      // Step 3: Prologue (streamed)
+      console.log('[App] Generating prologue...');
+      this._addPageMarker(1);
+      const pageDiv = document.createElement('div');
+      pageDiv.className = 'page-content streaming';
+      document.getElementById('story-content').appendChild(pageDiv);
+
+      const result = await LLM.generatePrologue(
+        game.worldBible, game.worldSummary, config,
+        (chunk) => {
+          pageDiv.textContent += chunk;
+          this._scrollStoryBottom();
+        },
+        game.writingStyle || 'default'
+      );
+
+      pageDiv.classList.remove('streaming');
+      pageDiv.innerHTML = marked.parse ? marked.parse(result.narrative) : result.narrative;
 
       if (!game.history) game.history = [];
       game.history.push({
         turn: 1,
         type: 'story',
         content: result.narrative,
-        choices: result.choices,
-        playerChoice: -1,
-        playerInput: null
+        assistantRaw: result.rawContent,
+        reasoning: result.reasoning,
+        playerAction: null
       });
 
       game.meta.totalTurns = 1;
       Pacing.recordTurn();
       game.pacing = Pacing.getState();
+      game.messageStore = MessageStore.toState();
       Store.saveGame();
 
-      this.showScreen('play');
-      this._loadPlayContent();
+      const beat = document.getElementById('story-beat');
+      beat.textContent = `── 节拍${Pacing.currentBeat} · ${Pacing.getBeatName()} ──`;
+
+      this._removeThinkingIndicator();
+      inputArea.classList.remove('thinking');
+      this._showInputArea();
+      this._updateStatsDisplay();
+      this._scrollStoryBottom();
+
     } catch (err) {
       this._removeThinkingIndicator();
+      inputArea.classList.remove('thinking');
       this._showError('故事生成失败: ' + err.message + '\n请检查 API Key 和网络连接');
+      this.showScreen('splash');
     }
   },
 
   /* ===== PLAY SCREEN ===== */
   _bindPlay() {
-    document.querySelectorAll('.choice-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.dataset.idx);
-        this._onChoice(idx);
-      });
-    });
-
-    document.getElementById('btn-send').addEventListener('click', () => this._onFreeInput());
+    document.getElementById('btn-continue').addEventListener('click', () => this._onContinue());
+    document.getElementById('btn-regenerate').addEventListener('click', () => this._onRegenerate());
     document.getElementById('free-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this._onFreeInput();
-    });
-
-    // Regenerate choices container dynamically
-    document.getElementById('choices-container').addEventListener('click', (e) => {
-      const btn = e.target.closest('.choice-btn');
-      if (btn && !btn.disabled) {
-        this._onChoice(parseInt(btn.dataset.idx));
-      }
     });
   },
 
@@ -627,23 +799,59 @@ const App = {
     storyEl.innerHTML = '';
     storyEl.classList.remove('typing');
 
+    const assistantMsgs = MessageStore.assistantMessages();
     const history = game.history || [];
-    if (history.length > 0) {
-      const last = history[history.length - 1];
-      storyEl.textContent = last.content;
+
+    if (assistantMsgs.length > 0) {
+      const narrativeMsgs = [];
+      for (let i = 0; i < assistantMsgs.length; i++) {
+        const msg = assistantMsgs[i];
+        const narrative = this._extractNarrativeFromMessage(msg);
+        if (narrative) narrativeMsgs.push(narrative);
+      }
+
+      if (narrativeMsgs.length > 0) {
+        narrativeMsgs.forEach((narrative, i) => {
+          this._addPageMarker(i + 1);
+          const pageDiv = document.createElement('div');
+          pageDiv.className = 'page-content';
+          pageDiv.innerHTML = marked.parse ? marked.parse(narrative) : narrative;
+          storyEl.appendChild(pageDiv);
+        });
+      }
       this._scrollStoryBottom();
 
       const beat = document.getElementById('story-beat');
       beat.textContent = `── 节拍${Pacing.currentBeat} · ${Pacing.getBeatName()} ──`;
 
-      if (last.choices && last.choices.length >= 2) {
-        this._showChoices(last.choices);
-      } else {
-        document.getElementById('play-input-area').style.display = 'none';
-      }
+      this._showInputArea();
+      this._updateStatsDisplay();
+    } else if (history.length > 0) {
+      history.forEach((entry, i) => {
+        this._addPageMarker(entry.turn);
+        const pageDiv = document.createElement('div');
+        pageDiv.className = 'page-content';
+        pageDiv.innerHTML = marked.parse ? marked.parse(entry.content) : entry.content;
+        storyEl.appendChild(pageDiv);
+      });
+      this._scrollStoryBottom();
+
+      const beat = document.getElementById('story-beat');
+      beat.textContent = `── 节拍${Pacing.currentBeat} · ${Pacing.getBeatName()} ──`;
+
+      this._showInputArea();
+      this._updateStatsDisplay();
     } else {
       this._startNewChapter();
     }
+  },
+
+  _extractNarrativeFromMessage(msg) {
+    const text = msg.content || '';
+    const narrMatch = text.match(/<narrative>([\s\S]*?)<\/narrative>/);
+    if (narrMatch) return narrMatch[1].trim();
+    const stripped = text.replace(/<response>|<\/response>/g, '').trim();
+    return stripped || text;
   },
 
   _startNewChapter() {
@@ -654,9 +862,9 @@ const App = {
     container.textContent = '等待故事生成...';
   },
 
-  _addPageMarker() {
+  _addPageMarker(turnNum) {
     const container = document.getElementById('story-content');
-    const turn = (Store.getGame()?.history?.length || 0) + 1;
+    const turn = turnNum || Store.getGame()?.history?.length || 1;
     const chName = Pacing.getChapterName();
     const maker = document.createElement('div');
     maker.className = 'page-marker';
@@ -664,142 +872,51 @@ const App = {
     container.appendChild(maker);
   },
 
-  _displayStory(text) {
-    const container = document.getElementById('story-content');
-    container.classList.remove('typing');
-    this._addPageMarker();
-    const pageDiv = document.createElement('div');
-    pageDiv.className = 'page-content';
-    const rendered = marked.parse ? marked.parse(text) : text;
-    pageDiv.innerHTML = rendered;
-    container.appendChild(pageDiv);
-
-    const beat = document.getElementById('story-beat');
-    beat.textContent = `── 节拍${Pacing.currentBeat} · ${Pacing.getBeatName()} ──`;
-    this._scrollStoryBottom();
+  _scrollStoryBottom() {
+    const storyEl = document.getElementById('play-story');
+    storyEl.scrollTop = storyEl.scrollHeight;
   },
 
-  _typewrite(text, speed, callback) {
-    const container = document.getElementById('story-content');
+  _showInputArea() {
     const inputArea = document.getElementById('play-input-area');
-    const beat = document.getElementById('story-beat');
-
-    container.classList.add('typing');
-    inputArea.style.display = 'none';
-    beat.textContent = '';
-
-    // Add page marker
-    this._addPageMarker();
-
-    // Create page content div
-    const pageDiv = document.createElement('div');
-    pageDiv.className = 'page-content';
-    container.appendChild(pageDiv);
-
-    let i = 0;
-    const chars = [...text];
-
-    const next = () => {
-      if (i < chars.length) {
-        pageDiv.textContent += chars[i];
-        i++;
-        this._scrollStoryBottom();
-
-        if (i % 3 === 0) {
-          setTimeout(next, speed);
-        } else {
-          requestAnimationFrame(next);
-        }
-      } else {
-        container.classList.remove('typing');
-        beat.textContent = `── 节拍${Pacing.currentBeat} · ${Pacing.getBeatName()} ──`;
-        this._scrollStoryBottom();
-        if (callback) callback();
-      }
-    };
-    next();
-  },
-
-  _showChoices(choices) {
-    const container = document.getElementById('choices-container');
-    const inputArea = document.getElementById('play-input-area');
-
-    container.innerHTML = '';
-    choices.forEach((text, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'choice-btn';
-      btn.dataset.idx = i;
-      btn.textContent = text;
-      container.appendChild(btn);
-    });
-
     inputArea.style.display = 'flex';
-    document.getElementById('free-input').disabled = false;
-    document.getElementById('free-input').value = '';
-    document.getElementById('btn-send').disabled = false;
+    inputArea.classList.remove('thinking');
   },
 
-  async _onChoice(idx) {
+  async _onContinue() {
     if (this._isProcessing) return;
-    this._isProcessing = true;
+    const action = this._buildDefaultAction();
+    await this._submitAction(action);
+  },
 
-    document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
-    document.getElementById('free-input').disabled = true;
-    document.getElementById('btn-send').disabled = true;
+  _buildDefaultAction() {
+    const beatType = Pacing.getBeatType();
+    const beatGoal = Pacing.getBeatGoal();
+    const beatName = Pacing.getBeatName();
+    const actionMap = {
+      'introduce': `探索当前场景，${beatGoal}`,
+      'build': `深化当前冲突，${beatGoal}`,
+      'twist': `引入意外转折，${beatGoal}`,
+      'climax': `推动冲突爆发，${beatGoal}`,
+      'resolve': `收束当前局面，${beatGoal}`
+    };
+    return actionMap[beatType] || `继续推进故事（当前节拍：${beatName}）`;
+  },
 
-    const inputArea = document.getElementById('play-input-area');
-    inputArea.classList.add('thinking');
-    this._showThinkingIndicator();
-
+  async _onRegenerate() {
+    if (this._isProcessing) return;
     const game = Store.getGame();
-    const config = Store.getConfig();
-    const history = game.history || [];
-    const lastEntry = history[history.length - 1] || {};
-    const choiceText = lastEntry.choices ? `玩家选择了: ${lastEntry.choices[idx] || '未知选项'}` : '玩家做出了选择';
-
-    Pacing.recordTurn();
-
-    try {
-      const pacXml = Pacing.getPacingXml();
-      const trope = this._getCurrentTrope();
-      const result = await LLM.generateStory(pacXml, game.worldSummary, history, choiceText, config, trope);
-
-      history.push({
-        turn: history.length + 1,
-        type: 'story',
-        content: result.narrative,
-        choices: result.choices,
-        playerChoice: idx,
-        playerInput: null
-      });
-      game.meta.totalTurns = Pacing.totalTurns;
-      game.pacing = Pacing.getState();
-      Store.saveGame();
-
-      this._removeThinkingIndicator();
-      inputArea.classList.remove('thinking');
-
-      this._typewrite(result.narrative, 18, () => {
-        if (result.choices && result.choices.length >= 2) {
-          setTimeout(() => this._showChoices(result.choices), 300);
-        } else {
-          this._showChoices([
-            '① 继续探索',
-            '② 调查周围环境',
-            '③ 检查随身物品'
-          ]);
-        }
-      });
-
-      this._checkChapterProgress();
-
-    } catch (err) {
-      this._removeThinkingIndicator();
-      inputArea.classList.remove('thinking');
-      this._showError(err.message);
-    } finally {
-      this._isProcessing = false;
-    }
+    if (!game || !game.history || game.history.length === 0) return;
+    game.history.pop();
+    const lastDynamicIdx = MessageStore._messages.map((m, i) => m.role === 'user' && m.content.includes('<pacing>') ? i : -1).filter(i => i >= 0).pop();
+    if (lastDynamicIdx !== undefined && lastDynamicIdx >= 0) MessageStore._messages.splice(lastDynamicIdx);
+    const lastAssistant = MessageStore._messages.findLastIndex(m => m.role === 'assistant');
+    if (lastAssistant >= 0) MessageStore._messages.splice(lastAssistant);
+    if (Pacing.turnInChapter > 0) Pacing.turnInChapter--;
+    if (Pacing.totalTurns > 0) Pacing.totalTurns--;
+    Store.saveGame();
+    const action = this._buildDefaultAction();
+    await this._submitAction(action);
   },
 
   async _onFreeInput() {
@@ -807,169 +924,176 @@ const App = {
     const text = input.value.trim();
     if (!text || this._isProcessing) return;
     input.value = '';
+    await this._submitAction(text);
+  },
 
+  async _submitAction(playerAction) {
     this._isProcessing = true;
-    document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
-    document.getElementById('btn-send').disabled = true;
+    const game = Store.getGame();
+    const config = Store.getConfig();
 
     const inputArea = document.getElementById('play-input-area');
     inputArea.classList.add('thinking');
     this._showThinkingIndicator();
 
-    const game = Store.getGame();
-    const config = Store.getConfig();
-    const history = game.history || [];
-    const choiceText = `玩家自由行动: ${text}`;
-
-    Pacing.recordTurn();
-
     try {
-      const pacXml = Pacing.getPacingXml();
-      const result = await LLM.generateStory(pacXml, game.worldSummary, history, choiceText, config);
+      const systemPrompt = LLM.buildSystemPrompt(game.worldSummary, game.writingStyle || 'default');
+      const staticWorld = LLM.buildStaticWorld(
+        game.worldSummary,
+        Pacing.getStoryContractXml(),
+        Pacing.getVolumeXml()
+      );
+      const pacingXml = Pacing.getPacingXml();
+      const persistentXml = Pacing.getPersistentXml();
+      const consequenceXml = Pacing.getConsequenceXml();
+      const tropeHint = this._getCurrentTrope();
+      const dynamicTurn = LLM.buildDynamicTurn(pacingXml, persistentXml, consequenceXml, tropeHint, playerAction);
 
-      history.push({
-        turn: history.length + 1,
+      this._addPageMarker((game.history?.length || 0) + 1);
+      const pageDiv = document.createElement('div');
+      pageDiv.className = 'page-content streaming';
+      document.getElementById('story-content').appendChild(pageDiv);
+
+      const result = await LLM.generateStory(
+        systemPrompt, staticWorld, game.history || [],
+        dynamicTurn, config,
+        (chunk) => {
+          pageDiv.textContent += chunk;
+          this._scrollStoryBottom();
+        }
+      );
+
+      pageDiv.classList.remove('streaming');
+      pageDiv.innerHTML = marked.parse ? marked.parse(result.narrative) : result.narrative;
+
+      if (!game.history) game.history = [];
+      game.history.push({
+        turn: game.history.length + 1,
         type: 'story',
         content: result.narrative,
-        choices: result.choices,
-        playerChoice: -1,
-        playerInput: text
+        assistantRaw: result.rawContent,
+        reasoning: result.reasoning,
+        playerAction: playerAction
       });
-      game.meta.totalTurns = Pacing.totalTurns;
+
+      game.meta.totalTurns = game.history.length;
+      Pacing.recordTurn();
+
+      this._extractConsequences(result.narrative);
+
+      if (Pacing.turnInChapter > 0 && Pacing.turnInChapter % 2 === 0) {
+        const beatResult = Pacing.advanceBeat();
+        if (beatResult === 'chapter_complete') {
+          Pacing.advanceChapter();
+        }
+      }
+
       game.pacing = Pacing.getState();
+      game.messageStore = MessageStore.toState();
       Store.saveGame();
 
-      this._removeThinkingIndicator();
-      inputArea.classList.remove('thinking');
-
-      this._typewrite(result.narrative, 18, () => {
-        if (result.choices && result.choices.length >= 2) {
-          setTimeout(() => this._showChoices(result.choices), 300);
-        } else {
-          this._showChoices([
-            '① 继续前进',
-            '② 停下来观察四周',
-            '③ 回想你记得的一切'
-          ]);
-        }
-      });
-
-      this._checkChapterProgress();
-
-    } catch (err) {
-      this._removeThinkingIndicator();
-      inputArea.classList.remove('thinking');
-      this._showError(err.message);
-    } finally {
-      this._isProcessing = false;
-    }
-  },
-
-  _checkChapterProgress() {
-    const beatResult = Pacing.advanceBeat();
-    if (beatResult === 'chapter_complete') {
-      const chResult = Pacing.advanceChapter();
-      const game = Store.getGame();
-      if (game) {
-        game.meta.currentChapter = Pacing.currentChapter;
-        game.meta.currentAct = Pacing.currentAct;
-        game.pacing = Pacing.getState();
-      }
+      const beat = document.getElementById('story-beat');
+      beat.textContent = `── 节拍${Pacing.currentBeat} · ${Pacing.getBeatName()} ──`;
 
       document.getElementById('play-chapter').textContent =
         `第${Pacing.currentChapter}章 · ${Pacing.getChapterName()}`;
 
-      if (chResult === 'game_complete') {
-        this._flashMessage('🏆 故事终章');
-      }
+      this._removeThinkingIndicator();
+      this._isProcessing = false;
+      this._updateStatsDisplay();
+      this._scrollStoryBottom();
+    } catch (err) {
+      this._removeThinkingIndicator();
+      this._isProcessing = false;
+      this._showError('故事生成失败: ' + err.message);
     }
   },
 
   _getCurrentTrope() {
-    const tropeHints = {
-      1: '',
-      2: '失忆英雄·主角的记忆封印在压力下可能产生被动触发',
-      3: '星空遗迹·废弃空间站中隐藏着远古文明的线索',
-      4: '绝境逢生·当前处境危险，但危机中藏着转机',
-      5: '真相碎片·发现的每一块信息都在拼凑更大的图景',
-      6: '宿命对决·距离第一次直面反派势力越来越近',
-      7: '扮猪吃虎·主角的实际潜力远超表面战力'
+    const genre = Pacing.genre || '';
+    const tropeMap = {
+      '仙侠': '天命之子、师徒传承、修炼突破',
+      '高武': '热血突破、武道争锋、以力破巧',
+      '都市': '隐藏身份、势力暗斗、能力觉醒',
+      '末世': '生存抉择、人性考验、资源争夺',
+      '诡异': '规则类怪谈、认知危害、不可名状'
     };
-    return tropeHints[Pacing.currentChapter] || '';
+    for (const [k, v] of Object.entries(tropeMap)) {
+      if (genre.includes(k)) return v;
+    }
+    return '英雄之旅、成长蜕变';
+  },
+
+  _extractConsequences(narrative) {
+    if (!narrative) return;
+    const text = narrative;
+    const keywords = [
+      { pattern: /击败了?(\S+)/, template: '战斗' },
+      { pattern: /杀死了?(\S+)/, template: '击杀' },
+      { pattern: /获得了?(\S+?)(?:，|。|、)/, template: '获得' },
+      { pattern: /遇到了?(\S+?)(?:，|。|、)/, template: '遭遇' },
+      { pattern: /发现了?(\S+?)(?:，|。|、)/, template: '发现' },
+      { pattern: /逃出了?(\S+?)(?:，|。|、)/, template: '逃脱' },
+      { pattern: /觉醒了?(\S+?)(?:，|。|、)/, template: '觉醒' },
+      { pattern: /受伤了?/, template: '受伤' }
+    ];
+    for (const kw of keywords) {
+      const match = text.match(kw.pattern);
+      if (match) {
+        Pacing.addConsequence(kw.template, match[0].substring(0, 50));
+        break;
+      }
+    }
+    const growthMatch = text.match(/(明白了?|领悟了?|学会了?|意识到?|决定了?)(.{2,20}?)(?:，|。)/);
+    if (growthMatch) {
+      Pacing.addCharacterGrowth(growthMatch[0].substring(0, 40));
+    }
+    const npcMatch = text.match(/[""「]([^""」]{2,10})[""」].*?说了?[:：]?\s*[""「]([^""」]{5,40})/);
+    if (npcMatch) {
+      Pacing.addRelationship(npcMatch[1], '对话', '互动');
+    }
   },
 
   _showThinkingIndicator() {
-    const inputArea = document.getElementById('play-input-area');
-    const overlay = document.getElementById('reasoning-overlay');
-    if (overlay) overlay.style.display = 'flex';
+    const bar = document.getElementById('thinking-bar');
+    if (bar) bar.style.display = 'flex';
 
-    // Show thinking state on input area
-    inputArea.classList.add('thinking');
+    const genre = Pacing.genre || '';
+    const genreMap = {
+      '仙侠': ['天机推演中', '灵气汇聚中'],
+      '高武': ['真气运转中', '武道推演中'],
+      '都市': ['情报收集中', '数据推演中'],
+      '末世': ['危机评估中', '生存推演中'],
+      '诡异': ['灵异感应中', '规则解析中']
+    };
 
-    // Cycle through status messages
-    this._reasoningMsgs = [
-      '星穹推演中',
-      '命运之线编织中',
-      '群星正在排列',
-      '因果律运算中',
-      '时间线收束中',
-      '叙事引擎运转中'
-    ];
-    this._reasoningSubs = [
-      '命运的齿轮开始转动',
-      '世界的脉络逐渐清晰',
-      '无数可能性坍缩为现实',
-      '星轨在虚空中延展',
-      '你选择的道路正在成形',
-      '故事在星辉中浮现'
-    ];
+    let msgs = ['命运推演中', '因果编织中'];
+    for (const [k, v] of Object.entries(genreMap)) {
+      if (genre.includes(k)) { msgs = v; break; }
+    }
+
     this._reasoningMsgIdx = 0;
     this._reasoningStart = Date.now();
-
     const msgEl = document.getElementById('reasoning-msg');
     const subEl = document.getElementById('reasoning-sub');
     const elapsedEl = document.getElementById('reasoning-elapsed');
 
-    if (msgEl) msgEl.textContent = this._reasoningMsgs[0];
-    if (subEl) subEl.textContent = this._reasoningSubs[0];
+    if (msgEl) msgEl.textContent = msgs[0];
 
-    // Cycle messages every 4 seconds
     if (this._reasoningInterval) clearInterval(this._reasoningInterval);
     this._reasoningInterval = setInterval(() => {
-      this._reasoningMsgIdx = (this._reasoningMsgIdx + 1) % this._reasoningMsgs.length;
-      if (msgEl) msgEl.textContent = this._reasoningMsgs[this._reasoningMsgIdx];
-      if (subEl) {
-        subEl.style.opacity = '0';
-        setTimeout(() => {
-          subEl.textContent = this._reasoningSubs[this._reasoningMsgIdx];
-          subEl.style.opacity = '1';
-        }, 200);
-      }
-
-      // Show elapsed time
+      this._reasoningMsgIdx = (this._reasoningMsgIdx + 1) % msgs.length;
+      if (msgEl) msgEl.textContent = msgs[this._reasoningMsgIdx];
       if (elapsedEl) {
         const elapsed = Math.floor((Date.now() - this._reasoningStart) / 1000);
-        if (elapsed > 3) {
-          elapsedEl.textContent = `${elapsed}s · 星海深处传来回响`;
-        }
+        if (elapsed > 3) elapsedEl.textContent = `${elapsed}s`;
       }
     }, 4000);
-
-    // Initial elapsed timer
-    if (this._elapsedTimer) clearInterval(this._elapsedTimer);
-    this._elapsedTimer = setInterval(() => {
-      if (elapsedEl && this._reasoningStart) {
-        const elapsed = Math.floor((Date.now() - this._reasoningStart) / 1000);
-        if (elapsed > 3) {
-          elapsedEl.textContent = `${elapsed}s · 星海深处传来回响`;
-        }
-      }
-    }, 1000);
   },
 
   _removeThinkingIndicator() {
-    const overlay = document.getElementById('reasoning-overlay');
-    if (overlay) overlay.style.display = 'none';
+    const bar = document.getElementById('thinking-bar');
+    if (bar) bar.style.display = 'none';
 
     const inputArea = document.getElementById('play-input-area');
     inputArea.classList.remove('thinking');
@@ -978,25 +1102,21 @@ const App = {
       clearInterval(this._reasoningInterval);
       this._reasoningInterval = null;
     }
-    if (this._elapsedTimer) {
-      clearInterval(this._elapsedTimer);
-      this._elapsedTimer = null;
-    }
     this._reasoningStart = null;
 
     const elapsedEl = document.getElementById('reasoning-elapsed');
     if (elapsedEl) elapsedEl.textContent = '';
   },
 
-  _scrollStoryBottom() {
-    const storyEl = document.getElementById('play-story');
-    const isAtBottom = storyEl.scrollHeight - storyEl.scrollTop - storyEl.clientHeight < 60;
-    if (isAtBottom) {
-      storyEl.scrollTo({
-        top: storyEl.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
+  /* ===== STATUS TOGGLE ===== */
+  _bindStatusToggle() {
+    const toggle = document.getElementById('status-toggle');
+    const status = document.getElementById('play-status');
+    if (!toggle || !status) return;
+    toggle.addEventListener('click', () => {
+      const collapsed = status.classList.toggle('collapsed');
+      toggle.textContent = collapsed ? '▼' : '▲';
+    });
   },
 
   /* ===== MENU ===== */
@@ -1013,30 +1133,6 @@ const App = {
 
     document.getElementById('menu-close').addEventListener('click', () => {
       overlay.style.display = 'none';
-    });
-
-    document.getElementById('menu-save').addEventListener('click', () => {
-      const game = Store.getGame();
-      if (game) {
-        game.pacing = Pacing.getState();
-        Store.setGame(game);
-        Store.saveGame();
-        overlay.style.display = 'none';
-        this._flashMessage('已保存');
-      }
-    });
-
-    document.getElementById('menu-load').addEventListener('click', () => {
-      if (Store.hasSavedGame()) {
-        Store.loadGame();
-        const loaded = Store.getGame();
-        if (loaded && loaded.pacing) {
-          Pacing.init(loaded.pacing);
-        }
-        overlay.style.display = 'none';
-        this._loadPlayContent();
-        this._flashMessage('已读取存档');
-      }
     });
 
     document.getElementById('menu-settings').addEventListener('click', () => {
@@ -1063,6 +1159,126 @@ const App = {
         `第${Pacing.currentChapter}章 | ${Pacing.totalTurns}回合`
       );
     });
+
+    document.getElementById('menu-outline').addEventListener('click', () => {
+      overlay.style.display = 'none';
+      const game = Store.getGame();
+      if (!game) return;
+      const chName = Pacing.getChapterName();
+      const actName = Pacing.getActName();
+      const beatType = Pacing.getBeatType();
+      const beatGoal = Pacing.getBeatGoal();
+      this._flashMessage(
+        `${actName} · 第${Pacing.currentChapter}章「${chName}」\n` +
+        `节拍 ${Pacing.currentBeat}/${Pacing.totalBeats} (${beatType})\n` +
+        `${beatGoal}`
+      );
+    });
+
+    document.getElementById('menu-world').addEventListener('click', () => {
+      overlay.style.display = 'none';
+      this._showWorldInfo();
+    });
+
+    document.getElementById('menu-stats').addEventListener('click', () => {
+      overlay.style.display = 'none';
+      this._showStatsPanel();
+    });
+
+    document.getElementById('world-info-bg').addEventListener('click', () => {
+      document.getElementById('world-info-overlay').style.display = 'none';
+    });
+    document.getElementById('world-info-close').addEventListener('click', () => {
+      document.getElementById('world-info-overlay').style.display = 'none';
+    });
+
+    document.getElementById('stats-bg').addEventListener('click', () => {
+      document.getElementById('stats-overlay').style.display = 'none';
+    });
+    document.getElementById('stats-close').addEventListener('click', () => {
+      document.getElementById('stats-overlay').style.display = 'none';
+    });
+  },
+
+  /* ===== WORLD INFO ===== */
+  _showWorldInfo() {
+    const game = Store.getGame();
+    if (!game) return;
+
+    const body = document.getElementById('world-info-body');
+    const summary = game.worldSummary || '';
+    const lines = summary.split('\n').filter(l => l.trim());
+
+    const summaryRows = lines.map(line => {
+      const parts = line.split('|').map(p => p.trim());
+      return parts.map(pair => {
+        const [label, ...rest] = pair.split(':');
+        const value = rest.join(':').trim();
+        if (!value) return `<div class="world-info-row"><span class="world-info-value">${label}</span></div>`;
+        const isGenre = label.includes('流派');
+        return `<div class="world-info-row"><span class="world-info-label">${label}</span><span class="world-info-value${isGenre ? ' accent' : ''}">${value}</span></div>`;
+      }).join('');
+    }).join('');
+
+    const pacingXml = Pacing.getPacingXml();
+    const state = game.state || {};
+    const proto = state.protagonist || {};
+
+    body.innerHTML = `
+      <div class="world-info-section">
+        <div class="world-info-section-title">世界概要</div>
+        ${summaryRows}
+      </div>
+      <div class="world-info-section">
+        <div class="world-info-section-title">主角状态</div>
+        <div class="world-info-row"><span class="world-info-label">境界</span><span class="world-info-value accent">${proto.realm || '凡体期'}</span></div>
+        <div class="world-info-row"><span class="world-info-label">状态</span><span class="world-info-value">${(proto.statusEffects || ['正常']).join(', ')}</span></div>
+        <div class="world-info-row"><span class="world-info-label">物品</span><span class="world-info-value">${(proto.inventory || []).join(', ') || '无'}</span></div>
+        <div class="world-info-row"><span class="world-info-label">位置</span><span class="world-info-value">${state.currentLocation || '未知'}</span></div>
+      </div>
+      <div class="world-info-section">
+        <div class="world-info-section-title">节奏状态 (XML)</div>
+        <div class="world-info-xml">${pacingXml.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+      </div>
+      <div class="world-info-section">
+        <div class="world-info-section-title">World Bible (XML)</div>
+        <div class="world-info-xml">${(game.worldBible || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+      </div>
+    `;
+
+    document.getElementById('world-info-overlay').style.display = 'flex';
+  },
+
+  /* ===== STATS PANEL ===== */
+  _showStatsPanel() {
+    const config = Store.getConfig();
+    const model = config.model || 'deepseek-v4-flash';
+    const totalUsage = MessageStore.totalUsage();
+    const report = TokenStats.buildReport(totalUsage, model);
+    const perCallRows = MessageStore.getUsage().map((u, i) => {
+      const r = TokenStats.buildReport(u, model);
+      return `<div class="world-info-row">
+        <span class="world-info-label">第${i + 1}次</span>
+        <span class="world-info-value">入${TokenStats.formatTokens(r.input)} 出${TokenStats.formatTokens(r.output)} 缓存${TokenStats.formatTokens(r.cache_hit)} → ${TokenStats.formatCost(r.total_cost_cny)}</span>
+      </div>`;
+    }).join('');
+
+    const body = document.getElementById('stats-body');
+    body.innerHTML = `
+      <div class="world-info-section">
+        <div class="world-info-section-title">累计统计 (${model})</div>
+        <div class="world-info-row"><span class="world-info-label">输入 Token</span><span class="world-info-value">${TokenStats.formatTokens(report.input)}</span></div>
+        <div class="world-info-row"><span class="world-info-label">输出 Token</span><span class="world-info-value">${TokenStats.formatTokens(report.output)}</span></div>
+        <div class="world-info-row"><span class="world-info-label">缓存命中</span><span class="world-info-value accent">${TokenStats.formatTokens(report.cache_hit)}</span></div>
+        <div class="world-info-row"><span class="world-info-label">缓存节省</span><span class="world-info-value accent">${TokenStats.formatCost(report.cache_saving_cny)}</span></div>
+        <div class="world-info-row"><span class="world-info-label">累计费用</span><span class="world-info-value accent">${TokenStats.formatCost(report.total_cost_cny)}</span></div>
+      </div>
+      <div class="world-info-section">
+        <div class="world-info-section-title">每次调用明细</div>
+        ${perCallRows || '<div class="world-info-row"><span class="world-info-value">暂无数据</span></div>'}
+      </div>
+    `;
+    document.getElementById('stats-overlay').style.display = 'flex';
   },
 
   /* ===== UTILITIES ===== */

@@ -41,7 +41,52 @@ const DiceSystem = {
   rollAll() {
     if (!this.data) return null;
     const results = this.data.layers.map(l => this.rollLayer(l));
-    this._resultCache = results;
+    this._resultCache = this._applyGenreOverrides(results);
+    return this._resultCache;
+  },
+
+  _getGenre(results) {
+    const tagLayer = results.find(l => l.layerId === 'tags');
+    if (!tagLayer) return null;
+    const genreDie = tagLayer.results.find(r => r.dieId === 'genre');
+    return genreDie ? genreDie.value : null;
+  },
+
+  _applyGenreOverrides(results) {
+    if (!this.data || !results) return results;
+    const genre = this._getGenre(results);
+    if (!genre) return results;
+
+    // 第一步：把所有曾有流派映射的骰子还原到原始 faces 值
+    //（处理流派变更后旧映射残留的问题）
+    for (const layer of this.data.layers) {
+      for (const die of layer.dice) {
+        if (!die.genre_faces) continue;
+        const layerResult = results.find(l => l.layerId === layer.id);
+        if (!layerResult) continue;
+        const dieResult = layerResult.results.find(r => r.dieId === die.id);
+        if (!dieResult) continue;
+        if (dieResult.faceIndex < die.faces.length) {
+          dieResult.value = die.faces[dieResult.faceIndex];
+          dieResult.totalFaces = die.faces.length;
+        }
+      }
+    }
+
+    // 第二步：对当前流派有映射的骰子，替换为流派适配值
+    for (const layer of this.data.layers) {
+      for (const die of layer.dice) {
+        if (!die.genre_faces || !die.genre_faces[genre]) continue;
+        const alternatives = die.genre_faces[genre];
+        const layerResult = results.find(l => l.layerId === layer.id);
+        if (!layerResult) continue;
+        const dieResult = layerResult.results.find(r => r.dieId === die.id);
+        if (!dieResult) continue;
+        const idx = Math.min(dieResult.faceIndex, alternatives.length - 1);
+        dieResult.value = alternatives[idx];
+        dieResult.totalFaces = alternatives.length;
+      }
+    }
     return results;
   },
 
@@ -54,6 +99,8 @@ const DiceSystem = {
     const dieIdx = layer.results.findIndex(r => r.dieId === dieId);
     if (dieIdx < 0) return null;
     layer.results[dieIdx] = this.rollDie(dieData);
+    // Re-apply genre overrides in case genre changed or other dice need remapping
+    this._resultCache = this._applyGenreOverrides(this._resultCache);
     return layer.results[dieIdx];
   },
 
