@@ -187,6 +187,14 @@ if (IS_TOUCH) document.body.classList.add('touch');
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && game.state === 'play') { game.state = 'pause'; AudioSys.suspendAudio(); }
   });
+  // 某些浏览器全屏的元素可能不是整页: 动态把手柄移入全屏元素, 退出后还原
+  const touchui = document.getElementById('touchui');
+  const onFsChange = () => {
+    const fs = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fs && !fs.contains(touchui)) fs.appendChild(touchui);
+    else if (!fs && touchui.parentElement !== wrap) wrap.appendChild(touchui);
+  };
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, onFsChange));
 })();
 
 function toggleFullscreen() {
