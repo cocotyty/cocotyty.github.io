@@ -1,0 +1,23 @@
+{
+  "description": "钢铁先锋 STEEL VANGUARD",
+  "packOptions": {
+    "ignore": [
+      { "type": "file", "value": "_shim.js" },
+      { "type": "file", "value": "_boot.js" },
+      { "type": "file", "value": "_smoke.js" }
+    ]
+  },
+  "setting": {
+    "urlCheck": false,
+    "es6": false,
+    "enhance": false,
+    "postcss": false,
+    "minified": false,
+    "newFeature": true
+  },
+  "compileType": "game",
+  "libVersion": "latest",
+  "appid": "touristappid",
+  "projectname": "steel-vanguard",
+  "condition": {}
+}

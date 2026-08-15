@@ -27,6 +27,21 @@
 
 桌面浏览器想用触控按钮：地址加 `?touch=1`。
 
+## 🎮 微信小游戏版
+
+`wxgame/` 目录是微信小游戏版（与网页版同源码自动打包）：
+
+- **玩法**：打开就是横屏全屏 + Canvas 虚拟手柄（方向垫可滑动换向 + FIRE/JUMP/NADE + 暂停/静音），菜单点屏幕确认
+- **适配**：无 DOM 环境（平台垫片）、WebAudio→`wx.createWebAudioContext`、最高分→`wx storage`、切后台自动暂停
+- **构建**：改了 `js/` 源码后运行 `node build-wx.js` 重新生成 `wxgame/game.js`
+
+**怎么在手机上玩（三步）：**
+1. 下载安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)（稳定版）
+2. 导入项目 → 目录选 `wxgame/` → AppID 选"测试号/游客模式" → 模拟器立即能玩（横屏）
+3. 想在真机上玩：工具栏"预览"扫码（游客模式支持）；或到 [mp.weixin.qq.com](https://mp.weixin.qq.com) 注册自己的小程序 AppID 填入 `project.config.json`
+
+> ⚠️ 微信政策：**个人主体不能正式发布"游戏类目"**（需企业资质+软著）。自己玩/朋友体验用上面的开发版/体验版完全没问题。
+
 | 操作 | 按键 |
 |---|---|
 | 移动 | ← → 或 A D |
