@@ -24,19 +24,18 @@ const App = {
   raf: 0, lastT: 0,
   menuT: 0,
   coarse: false,        // 触屏设备(两步建造)
-  softLandscape: false, // 软件横屏开关
-  rotated: false,       // 当前处于旋转渲染
   pendingBuild: null    // 触屏待确认的建造 {gx,gy}
 };
 
-/* URL 调试参数:?touch 强制触屏逻辑 / ?landscape 强制软件横屏 */
+/* URL 调试参数:?touch 强制触屏逻辑 */
 (function(){
   const qp = new URLSearchParams(location.search);
   if(qp.has('touch')) App.coarse = true;
-  if(qp.has('landscape')) App.softLandscape = true;
   try{
     if(window.matchMedia && matchMedia('(pointer:coarse)').matches) App.coarse = true;
   }catch(e){}
+  // 触屏布局开关:HUD 压缩 + 棋盘居左 + 商店竖排右侧(桌面端不变)
+  if(App.coarse) document.body.classList.add('coarse');
 })();
 
 Sound.setMuted(App.save.muted);
@@ -90,41 +89,16 @@ function resize(){
   positionPanel();
   if(App.pendingBuild && App.game) showBuildConfirm(App.pendingBuild.gx, App.pendingBuild.gy);
 }
-function updateRotation(){
-  const app = $('app');
-  const portrait = window.innerHeight > window.innerWidth;
-  const active = App.softLandscape && portrait;
-  App.rotated = active;
-  if(active){
-    app.classList.add('rot90');
-    app.style.left = window.innerWidth + 'px';
-    app.style.width = window.innerHeight + 'px';
-    app.style.height = window.innerWidth + 'px';
-  } else {
-    app.classList.remove('rot90');
-    app.style.left = ''; app.style.width = ''; app.style.height = '';
-  }
-  resize();
-}
-window.addEventListener('resize', updateRotation);
-window.addEventListener('orientationchange', ()=>setTimeout(updateRotation, 250));
-document.addEventListener('fullscreenchange', updateRotation);
-document.addEventListener('webkitfullscreenchange', updateRotation);
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', ()=>setTimeout(resize, 250));
+document.addEventListener('fullscreenchange', resize);
+document.addEventListener('webkitfullscreenchange', resize);
 
-/* 指针 → 世界坐标(软件横屏时做90°逆变换) */
+/* 指针 → 世界坐标 */
 function toWorld(ev){
   const r = boardCv.getBoundingClientRect();
-  let cx, cy;
-  if(App.rotated){
-    // 容器顺时针旋转90°:本地x沿屏幕向下,本地y沿屏幕向左
-    cx = ev.clientY - r.top;
-    cy = r.right - ev.clientX;
-  } else {
-    cx = ev.clientX - r.left;
-    cy = ev.clientY - r.top;
-  }
-  return { x: (cx - App.ox) / App.zoom,
-           y: (cy - App.oy) / App.zoom };
+  return { x: (ev.clientX - r.left - App.ox) / App.zoom,
+           y: (ev.clientY - r.top - App.oy) / App.zoom };
 }
 
 /* ---------------- 触屏两步建造 ---------------- */
@@ -478,7 +452,7 @@ function startLevel(idx){
   $('btn-speed').textContent = '×1';
   show('scr-game');
   buildShop();
-  updateRotation();
+  resize();
   positionPanel();
   banner('「'+LEVELS[idx].name+'」— 守住魂火!', false);
 }
@@ -575,7 +549,7 @@ function drawMenuFire(){
   mctx.drawImage(fl, 0, 0, fl.width, fl.height, 23, 6, 50, 55);
 }
 
-/* ---------------- 全屏 / 软件横屏 ---------------- */
+/* ---------------- 全屏(移动端强制横屏:竖屏由 #rotate-overlay 拦截) ---------------- */
 async function toggleFullscreen(){
   const doc = document;
   const fsEl = doc.fullscreenElement || doc.webkitFullscreenElement;
@@ -584,8 +558,6 @@ async function toggleFullscreen(){
       if(doc.exitFullscreen) await doc.exitFullscreen();
       else if(doc.webkitExitFullscreen) doc.webkitExitFullscreen();
     }catch(e){}
-    App.softLandscape = false;
-    updateRotation();
     return;
   }
   const el = doc.documentElement;
@@ -594,26 +566,13 @@ async function toggleFullscreen(){
     if(el.requestFullscreen){ await el.requestFullscreen(); entered = true; }
     else if(el.webkitRequestFullscreen){ el.webkitRequestFullscreen(); entered = true; }
   }catch(e){}
-  if(!entered){
-    // iPhone 等:不支持页面全屏,退化为软件横屏模式
-    App.softLandscape = !App.softLandscape;
-    toast(App.softLandscape ? '已开启横屏模式:请旋转设备' : '已关闭横屏模式');
-    updateRotation();
-    return;
-  }
-  // 全屏成功:优先系统级锁定横屏(安卓),失败则软件横屏兜底
-  let locked = false;
+  // 不支持页面全屏(如 iPhone):提示旋转设备,竖屏遮罩仍会拦截
+  if(!entered){ toast('请旋转设备至横屏游玩'); return; }
+  // 全屏成功:尝试系统级锁定横屏(安卓),失败则靠用户物理旋转
   try{
-    if(screen.orientation && screen.orientation.lock){
+    if(screen.orientation && screen.orientation.lock)
       await screen.orientation.lock('landscape');
-      locked = true;
-    }
   }catch(e){}
-  if(!locked){
-    App.softLandscape = true;
-    toast('已开启软件横屏:请旋转设备');
-  }
-  updateRotation();
 }
 
 $('btn-fs').addEventListener('pointerdown', ()=>{ Sound.init(); Sound.play('click'); toggleFullscreen(); });
@@ -681,7 +640,7 @@ document.addEventListener('dblclick', ev=>ev.preventDefault());
 App.sprites = buildAllSprites();
 syncMuteButtons();
 show('scr-menu');
-updateRotation();
+resize();
 requestAnimationFrame(t=>{ App.lastT = t; loop(t); });
 
 /* 调试/测试只读入口 */

@@ -54,26 +54,28 @@
       <div class="hud-spacer"></div>
       <button id="btn-callwave" class="btn btn-sm btn-wave hidden">下一波 ▶</button>
       <button id="btn-speed" class="icon-btn" title="游戏速度">×1</button>
-      <button id="btn-fs" class="icon-btn" title="全屏/横屏">⛶</button>
+      <button id="btn-fs" class="icon-btn" title="全屏">⛶</button>
       <button id="btn-mute2" class="icon-btn" title="音效">♪</button>
     </div>
-    <div id="board-wrap">
-      <canvas id="board"></canvas>
-      <div id="vignette"></div>
-      <div id="scanlines"></div>
-      <div id="wave-banner" class="hidden"></div>
-      <div id="ctx-panel" class="hidden"></div>
-      <div id="build-confirm" class="hidden">
-        <div class="bc-title"></div>
-        <div class="prow">
-          <button class="btn up" id="bc-ok">✓ 建造</button>
-          <button class="btn sell" id="bc-no">✕ 取消</button>
+    <div id="game-main">
+      <div id="board-wrap">
+        <canvas id="board"></canvas>
+        <div id="vignette"></div>
+        <div id="scanlines"></div>
+        <div id="wave-banner" class="hidden"></div>
+        <div id="ctx-panel" class="hidden"></div>
+        <div id="build-confirm" class="hidden">
+          <div class="bc-title"></div>
+          <div class="prow">
+            <button class="btn up" id="bc-ok">✓ 建造</button>
+            <button class="btn sell" id="bc-no">✕ 取消</button>
+          </div>
         </div>
+        <div id="toast" class="hidden"></div>
       </div>
-      <div id="toast" class="hidden"></div>
-    </div>
-    <div id="shop-bar">
-      <div id="shop"></div>
+      <div id="shop-bar">
+        <div id="shop"></div>
+      </div>
     </div>
   </div>
 
@@ -82,6 +84,13 @@
     <div id="modal-box"></div>
   </div>
 
+</div>
+
+<!-- ===== 竖屏提示(移动端强制横屏,借鉴 race) ===== -->
+<div id="rotate-overlay">
+  <div class="rotate-icon">📱</div>
+  <div class="rotate-txt">请旋转设备至横屏游玩<br>ROTATE TO LANDSCAPE</div>
+</div>
 <script>
 /* 调试:收集运行时错误 */
 window.__errs = [];
@@ -89,7 +98,6 @@ window.addEventListener('error', function(e){
   window.__errs.push((e.message||'error') + ' @' + (e.filename||'').split('/').pop() + ':' + (e.lineno||0));
 });
 </script>
-</div>
 <script src="js/data.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/game.js"></script>

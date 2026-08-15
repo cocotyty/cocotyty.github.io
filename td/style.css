@@ -122,8 +122,10 @@ body{font-family:var(--font-pixel);color:var(--text);font-size:12px;line-height:
   50%{box-shadow:0 3px 0 #000,inset 0 0 0 2px #7e2020,0 0 12px #c2232366}}
 
 /* ---------- 棋盘 ---------- */
-#board-wrap{position:relative;flex:1 1 auto;width:100%;overflow:hidden;
-  touch-action:none;background:#050508;min-height:0}
+#game-main{flex:1 1 auto;display:flex;flex-direction:column;
+  min-height:0;min-width:0;width:100%}
+#board-wrap{position:relative;flex:1 1 auto;overflow:hidden;
+  touch-action:none;background:#050508;min-height:0;min-width:0}
 #board{position:absolute;inset:0;width:100%;height:100%;
   image-rendering:pixelated;image-rendering:crisp-edges}
 #vignette{position:absolute;inset:0;pointer-events:none;
@@ -145,11 +147,15 @@ body{font-family:var(--font-pixel);color:var(--text);font-size:12px;line-height:
   animation:toastIn .18s ease-out}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}
   to{opacity:1;transform:translateX(-50%) translateY(0)}}
+/* 左上角定位的面板不能用 toastIn(其 translateX(-50%) 会让面板先偏左、
+   动画结束再跳回右侧),用纯纵向淡入 */
+@keyframes panelIn{from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}}
 
 /* ---------- 塔操作面板 ---------- */
 #ctx-panel{position:absolute;z-index:7;background:var(--panel);
   border:2px solid var(--line2);box-shadow:0 5px 0 #000,inset 0 0 0 2px #0d0d14;
-  padding:10px;width:196px;font-size:10px;animation:toastIn .15s ease-out}
+  padding:10px;width:196px;font-size:10px;animation:panelIn .15s ease-out}
 #ctx-panel h3{margin:0 0 6px;font-size:11px;color:#ffedd0;letter-spacing:1px;
   display:flex;justify-content:space-between;align-items:center;gap:6px}
 #ctx-panel h3 .lv{color:var(--gold)}
@@ -163,7 +169,7 @@ body{font-family:var(--font-pixel);color:var(--text);font-size:12px;line-height:
 #ctx-panel .arrow-next{color:var(--green)}
 
 /* ---------- 商店 ---------- */
-#shop-bar{flex:0 0 auto;width:100%;background:linear-gradient(#12121b,#0c0c12);
+#shop-bar{flex:0 0 auto;background:linear-gradient(#12121b,#0c0c12);
   border-top:2px solid #000;box-shadow:0 -2px 0 #2e2e4033;
   padding:8px 8px calc(8px + env(safe-area-inset-bottom));z-index:5}
 #shop{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;
@@ -208,14 +214,39 @@ body{font-family:var(--font-pixel);color:var(--text);font-size:12px;line-height:
 /* ---------- 建造确认面板(触屏两步建造) ---------- */
 #build-confirm{position:absolute;z-index:7;background:var(--panel);
   border:2px solid #6a5a1a;box-shadow:0 5px 0 #000,inset 0 0 0 2px #0d0d14;
-  padding:8px;width:150px;animation:toastIn .15s ease-out}
+  padding:8px;width:150px;animation:panelIn .15s ease-out}
 #build-confirm .bc-title{font-size:9px;color:var(--gold);margin-bottom:6px;
   text-align:center;letter-spacing:1px}
 #build-confirm .prow{display:flex;gap:6px}
 #build-confirm .prow .btn{flex:1;font-size:9px;padding:8px 4px;text-align:center}
 
-/* ---------- 软件横屏(竖屏时整体旋转90°) ---------- */
-#app.rot90{inset:auto;top:0;transform:rotate(90deg);transform-origin:0 0}
+/* ---------- 竖屏提示(移动端强制横屏,借鉴 race) ---------- */
+#rotate-overlay{position:fixed;inset:0;z-index:100;background:#0a0a10;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+.rotate-icon{font-size:64px;animation:rot 1.6s ease-in-out infinite alternate}
+@keyframes rot{from{transform:rotate(0deg)}to{transform:rotate(90deg)}}
+.rotate-txt{font-size:11px;color:var(--text);line-height:2;padding:0 24px}
+/* 仅触屏设备竖屏时显示;桌面端竖长窗口不受影响 */
+@media (orientation:portrait){ body.coarse #rotate-overlay{display:flex} }
+
+/* ---------- 触屏布局:HUD 压缩,棋盘居左,塔商店竖排右侧窄条 ---------- */
+body.coarse #hud{gap:5px;padding:calc(4px + env(safe-area-inset-top)) 6px 4px}
+body.coarse .hud-stat{font-size:9px;padding:3px 6px;gap:4px}
+body.coarse .hud-stat span{min-width:20px}
+body.coarse .icon-btn{min-width:30px;height:26px;font-size:9px}
+body.coarse .btn-wave{font-size:9px;padding:4px 8px}
+body.coarse #game-main{flex-direction:row}
+body.coarse #board-wrap{flex:1 1 auto}
+body.coarse #shop-bar{display:flex;flex-direction:column;width:84px;flex:0 0 auto;
+  background:linear-gradient(90deg,#12121b,#0c0c12);
+  border-top:none;border-left:2px solid #000;
+  box-shadow:-2px 0 0 #2e2e4033;
+  padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+body.coarse #shop{flex:1 1 auto;min-height:0;flex-direction:column;
+  overflow-x:hidden;overflow-y:auto;touch-action:pan-y;padding-bottom:2px}
+body.coarse #shop::-webkit-scrollbar{width:6px;height:0}
+body.coarse .shop-item{width:auto;padding:6px 2px 5px}
+body.coarse .shop-item canvas{width:40px;height:40px}
 
 /* ---------- 响应式 ---------- */
 @media (max-width:560px){
