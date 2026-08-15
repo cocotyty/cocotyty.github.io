@@ -190,8 +190,21 @@ if (IS_TOUCH) document.body.classList.add('touch');
 })();
 
 function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else if (wrap.requestFullscreen) wrap.requestFullscreen();
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+    try { screen.orientation && screen.orientation.unlock && screen.orientation.unlock(); } catch (e) {}
+  } else {
+    // 全屏整个页面而非画布容器, 否则虚拟手柄层(#touchui)会被隐藏
+    const el = document.documentElement;
+    try {
+      const p = el.requestFullscreen();
+      if (p && p.then) p.then(() => {
+        // 安卓 Chrome: 全屏后锁定横屏; iOS 不支持则静默忽略
+        if (screen.orientation && screen.orientation.lock)
+          screen.orientation.lock('landscape').catch(() => {});
+      }).catch(() => {});
+    } catch (e) {}
+  }
 }
 function fit() {
   const w = window.innerWidth, h = window.innerHeight;
@@ -320,6 +333,7 @@ const game = {
     this.camX = Math.max(0, Math.min(this.level.pxW - VW, this.player.cx - 120));
     this.shake = 0;
     this.state = 'intro'; this.stateT = 0; this.tallyDone = false;
+    if (IS_TOUCH) this.toast('TIP: FS BUTTON = FULLSCREEN');
     Music.stop();
   },
   startRun() {
