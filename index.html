@@ -2,290 +2,471 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0a0a12">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="mobile-web-app-capable" content="yes">
-<title>星穹编年史</title>
-<link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="css/style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a10">
+<meta name="description" content="cocotyty 的 Vibe Game 游戏廊 — 魂火守卫 · 钢铁先锋 · 星穹编年史 / cocotyty's vibe game gallery">
+<title>cocotyty · 像素游戏廊</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0a10; --panel:#15151f; --panel2:#1c1c29; --line:#2e2e40; --line2:#45455e;
+  --text:#cfc9b8; --dim:#8a8578; --gold:#f2cf46; --blood:#ff3b30; --green:#7cd63e;
+  --font:'Press Start 2P','Zpix','SimSun',monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:var(--font);font-size:12px;line-height:1.7}
+body{min-height:100vh;
+  background:
+    radial-gradient(ellipse at 50% -10%,#141228 0%,transparent 55%),
+    radial-gradient(ellipse at 50% 115%,#1c1016 0%,transparent 50%),
+    var(--bg)}
+a{color:var(--gold);text-decoration:none}
+a:hover{text-shadow:0 0 8px #f2cf4688}
+.wrap{max-width:980px;margin:0 auto;padding:34px 18px 60px}
+
+/* ---------- 顶部 Profile ---------- */
+.hero{display:flex;gap:22px;align-items:center;padding:22px;
+  background:linear-gradient(135deg,#181826 0%,#12121c 100%);
+  border:2px solid var(--line2);box-shadow:0 6px 0 #000,inset 0 0 0 2px #0d0d14;
+  margin-bottom:14px;flex-wrap:wrap;position:relative}
+.avatar-box{flex:0 0 auto;position:relative}
+.avatar{width:92px;height:92px;image-rendering:pixelated;border:3px solid var(--line2);
+  box-shadow:0 0 0 3px #0d0d14,0 0 22px #f2cf4622;background:var(--panel2)}
+.avatar-box .dot{position:absolute;right:-4px;bottom:-4px;width:16px;height:16px;
+  background:#22301c;border:2px solid var(--green);animation:blink 2.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.hero-info{flex:1 1 300px;min-width:260px}
+.hero-name{font-size:18px;color:#ffedd0;letter-spacing:2px;margin:0 0 2px;
+  text-shadow:0 0 12px #ff8c2855,2px 2px 0 #000}
+.hero-name .hand{color:var(--blood);text-shadow:0 0 10px #c2232388}
+.hero-sub{font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:10px}
+.hero-bio{font-size:10px;color:var(--text);margin:0 0 10px;font-family:var(--font)}
+.hero-bio b{color:var(--gold);font-weight:normal}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-size:8px;padding:5px 9px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--dim);box-shadow:0 2px 0 #000}
+.chip b{color:var(--text);font-weight:normal}
+.chip.star b{color:var(--gold)}
+.lang-btn{position:absolute;top:10px;right:10px;font-family:var(--font);font-size:9px;
+  color:var(--text);background:var(--panel2);border:2px solid var(--line2);cursor:pointer;
+  padding:7px 11px;letter-spacing:1px;box-shadow:0 3px 0 #000}
+.lang-btn:hover{border-color:var(--gold);color:var(--gold)}
+.lang-btn:active{transform:translateY(2px);box-shadow:0 1px 0 #000}
+
+/* ---------- 标题 ---------- */
+.sec-title{margin:34px 0 16px;font-size:13px;color:#ffedd0;letter-spacing:4px;
+  text-shadow:0 0 10px #ff8c2844,2px 2px 0 #000;display:flex;align-items:center;gap:12px}
+.sec-title::after{content:"";flex:1;height:2px;
+  background:repeating-linear-gradient(90deg,var(--line2) 0 6px,transparent 6px 12px)}
+
+/* ---------- 游戏卡片 ---------- */
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+.card{position:relative;display:block;background:var(--panel);
+  border:2px solid var(--line);box-shadow:0 6px 0 #000;
+  transition:transform .1s,border-color .1s;overflow:hidden}
+.card:hover{transform:translateY(-3px);border-color:var(--gold)}
+.card:hover .card-go{opacity:1;transform:translateX(0)}
+.card-thumb{position:relative;width:100%;aspect-ratio:16/9;background:#050508;overflow:hidden}
+.card-thumb canvas{position:absolute;inset:0;width:100%;height:100%;
+  image-rendering:pixelated;image-rendering:crisp-edges}
+.card-thumb::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.5) 100%)}
+.badge-new{position:absolute;top:8px;left:8px;z-index:2;font-size:8px;color:#fff;
+  background:var(--blood);padding:4px 7px;letter-spacing:1px;
+  box-shadow:0 0 12px #c22323aa,2px 2px 0 #000;animation:badgePulse 1.6s infinite}
+@keyframes badgePulse{0%,100%{background:#c22323}50%{background:#ff3b30}}
+.card-body{padding:13px 14px 15px}
+.card-title{font-size:12px;color:#ffedd0;letter-spacing:1px;margin:0 0 3px;
+  text-shadow:1px 1px 0 #000}
+.card-title small{color:var(--dim);font-size:8px;margin-left:8px;letter-spacing:2px}
+.card-desc{font-size:9px;color:var(--dim);line-height:1.9;margin:6px 0 10px;min-height:50px}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:8px;color:#a3b4c4;background:#0d0d15;border:1px solid var(--line);padding:3px 6px}
+.card-go{position:absolute;right:12px;bottom:14px;font-size:9px;color:var(--gold);
+  opacity:0;transform:translateX(-6px);transition:all .15s}
+
+/* ---------- 页脚 ---------- */
+footer{margin-top:44px;padding-top:18px;border-top:2px solid var(--line);
+  display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  font-size:8px;color:#5a5648;letter-spacing:1px}
+footer a{color:#8a8578}
+footer a:hover{color:var(--gold)}
+@media (max-width:560px){
+  .hero{padding:16px;gap:14px}
+  .avatar{width:68px;height:68px}
+  .hero-name{font-size:15px}
+  .card-desc{min-height:0}
+  .lang-btn{position:static;margin-bottom:6px;align-self:flex-start}
+}
+</style>
 </head>
 <body>
+<div class="wrap">
 
-<canvas id="starfield"></canvas>
-
-<div id="app">
-
-  <!-- ===== SPLASH / BOOKSHELF ===== -->
-  <div id="screen-splash" class="screen active">
-    <div class="screen-inner">
-      <div class="splash-header">
-        <span class="splash-icon">✦</span>
-        <h1>星穹编年史</h1>
-        <p class="splash-subtitle">Chronicles of the Starry Void</p>
-      </div>
-      <button class="btn btn-primary splash-new-btn" id="btn-new-game">✦ 创造新世界</button>
-      <div class="bookshelf" id="bookshelf">
-        <div class="bookshelf-empty" id="bookshelf-empty">
-          <p>还没有世界</p>
-          <p class="bookshelf-hint">点击上方按钮，让群星为你排列一个全新的宇宙</p>
-        </div>
-      </div>
-      <div class="splash-footer">
-        <button class="btn btn-sm" id="btn-settings" data-goto="settings">⚙ 设置</button>
-        <span class="api-status" id="api-status">⚡ 已连接</span>
-        <span class="splash-version">v0.1</span>
+  <!-- ============ PROFILE ============ -->
+  <header class="hero">
+    <button class="lang-btn" id="lang-btn" title="Switch language">EN</button>
+    <div class="avatar-box">
+      <img class="avatar" src="https://github.com/cocotyty.png" alt="cocotyty"
+        onerror="this.outerHTML='<canvas id=\\'av\\\' width=16 height=16 style=\\'width:92px;height:92px;image-rendering:pixelated;border:3px solid #45455e\\'></canvas>'">
+      <span class="dot"></span>
+    </div>
+    <div class="hero-info">
+      <h1 class="hero-name">cocotyty <span class="hand">▲</span></h1>
+      <div class="hero-sub">INTEL SOFTWARE ENGINEER · LLM ON XEON · VIBE GAMING</div>
+      <p class="hero-bio" data-i18n="bio"></p>
+      <div class="stats">
+        <span class="chip"><b>112</b> <span data-i18n="chipRepos"></span></span>
+        <span class="chip"><b>31</b> <span data-i18n="chipFollowers"></span></span>
+        <span class="chip star">dpig <b>★45</b></span>
+        <span class="chip">🦈 Pull Shark ×2</span>
+        <span class="chip">⭐ Starstruck</span>
+        <span class="chip">🧊 Arctic Code Vault</span>
       </div>
     </div>
+  </header>
+
+  <!-- ============ GALLERY ============ -->
+  <h2 class="sec-title" data-i18n="secTitle"></h2>
+  <div class="gallery">
+
+    <a class="card" href="td/" id="card-td">
+      <div class="card-thumb">
+        <span class="badge-new">NEW!</span>
+        <canvas width="128" height="72"></canvas>
+      </div>
+      <div class="card-body">
+        <h3 class="card-title"><span data-i18n="tdName"></span><small data-i18n="tdSub"></small></h3>
+        <p class="card-desc" data-i18n="tdDesc"></p>
+        <div class="tags" data-i18n-tags="tdTags"></div>
+        <span class="card-go" data-i18n="goGame"></span>
+      </div>
+    </a>
+
+    <a class="card" href="vibegame/" id="card-vg">
+      <div class="card-thumb"><canvas width="128" height="72"></canvas></div>
+      <div class="card-body">
+        <h3 class="card-title"><span data-i18n="vgName"></span><small data-i18n="vgSub"></small></h3>
+        <p class="card-desc" data-i18n="vgDesc"></p>
+        <div class="tags" data-i18n-tags="vgTags"></div>
+        <span class="card-go" data-i18n="goGame"></span>
+      </div>
+    </a>
+
+    <a class="card" href="chronicle/" id="card-ch">
+      <div class="card-thumb"><canvas width="128" height="72"></canvas></div>
+      <div class="card-body">
+        <h3 class="card-title"><span data-i18n="chName"></span><small data-i18n="chSub"></small></h3>
+        <p class="card-desc" data-i18n="chDesc"></p>
+        <div class="tags" data-i18n-tags="chTags"></div>
+        <span class="card-go" data-i18n="goApp"></span>
+      </div>
+    </a>
+
   </div>
 
-  <!-- ===== SETTINGS ===== -->
-  <div id="screen-settings" class="screen">
-    <div class="screen-inner">
-      <div class="settings-header">
-        <button class="btn-back" data-back>←</button>
-        <h2>⚙ 设置</h2>
-      </div>
-      <div class="settings-body">
-        <label class="field">
-          <span class="field-label">API 端点</span>
-          <input type="url" class="input" id="api-endpoint" placeholder="https://api.openai.com/v1/chat/completions" autocomplete="off">
-        </label>
-        <label class="field">
-          <span class="field-label">API Key</span>
-          <input type="password" class="input" id="api-key" placeholder="sk-..." autocomplete="off">
-        </label>
-        <label class="field">
-          <span class="field-label">模型</span>
-            <select class="input" id="api-model">
-            <option value="deepseek-chat">DeepSeek V3</option>
-            <option value="deepseek-reasoner">DeepSeek R1</option>
-            <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-            <option value="gpt-4o">GPT-4o</option>
-            <option value="gpt-4o-mini">GPT-4o Mini</option>
-            <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-            <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
-            <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-            <option value="custom">自定义</option>
-          </select>
-        </label>
-        <label class="field">
-          <span class="field-label">温度 (创造力)</span>
-          <div class="slider-row">
-            <span>冷静</span>
-            <input type="range" class="slider" id="api-temp" min="0.3" max="1.5" step="0.1" value="0.9">
-            <span>奔放</span>
-          </div>
-          <span class="slider-value" id="temp-value">0.9</span>
-        </label>
-        <label class="field field-toggle">
-          <span class="field-label">调试模式</span>
-          <label class="toggle">
-            <input type="checkbox" id="api-debug">
-            <span class="toggle-slider"></span>
-          </label>
-        </label>
-        <p class="field-hint">开启后跳过掷骰，直接加载预设世界</p>
-        <button class="btn btn-primary" id="settings-save">保存设置</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== WORLD GEN ===== -->
-  <div id="screen-world-gen" class="screen">
-    <div class="screen-inner">
-      <div class="settings-header">
-        <button class="btn-back" data-back>←</button>
-        <h2>✦ 掷骰定世</h2>
-      </div>
-      <div id="dice-container" class="dice-container">
-        <p class="dice-placeholder">命运的骰子尚未掷出...</p>
-        <p class="dice-hint">（骰子系统将在 Phase 2 实现）</p>
-      </div>
-      <div id="style-selector" class="style-selector" style="display:none">
-        <h3 class="style-selector-title">🖋️ 写作风格</h3>
-        <div id="style-cards" class="style-cards"></div>
-      </div>
-      <div class="dice-actions">
-        <button class="btn btn-primary" id="btn-confirm-world" disabled>
-          确认世界 · 命运开始
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== EDIT WORLD ===== -->
-  <div id="screen-edit" class="screen">
-    <div class="screen-inner">
-      <div class="settings-header">
-        <button class="btn-back" id="btn-edit-back">←</button>
-        <h2>✎ 编辑世界</h2>
-      </div>
-      <div class="edit-info" id="edit-info">
-        <span class="field-label">世界名</span>
-        <input type="text" class="input" id="edit-world-name" placeholder="输入世界名称">
-      </div>
-      <div id="edit-dice-container" class="dice-container"></div>
-      <div id="edit-style-selector" class="style-selector" style="display:none">
-        <h3 class="style-selector-title">🖋️ 写作风格</h3>
-        <div id="edit-style-cards" class="style-cards"></div>
-      </div>
-      <div class="dice-actions" style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn-primary" id="btn-edit-save">保存修改</button>
-        <button class="btn btn-danger" id="btn-edit-delete">🗑 删除此世界</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== API PROMPT ===== -->
-  <div id="api-prompt" class="overlay" style="display:none">
-    <div class="overlay-bg" id="api-prompt-bg"></div>
-    <div class="confirm-panel" style="text-align:left;width:88%;max-width:340px">
-      <p class="confirm-text" style="text-align:center">🔑 配置 API</p>
-      <p class="confirm-sub" style="text-align:center;margin-bottom:16px">需要 API Key 才能生成故事</p>
-      <label class="field" style="margin-bottom:12px">
-        <span class="field-label">API Key</span>
-        <form style="display:flex;flex-direction:column;gap:6px" autocomplete="off"><input type="password" class="input" id="prompt-api-key" placeholder="sk-..." autocomplete="off"></form>
-      </label>
-      <label class="field" style="margin-bottom:8px">
-        <span class="field-label">API 端点</span>
-        <input type="url" class="input" id="prompt-api-endpoint" value="https://api.deepseek.com/v1/chat/completions" autocomplete="off">
-      </label>
-      <label class="field" style="margin-bottom:12px">
-        <span class="field-label">模型</span>
-        <div style="display:flex;gap:6px">
-          <input type="text" class="input" id="prompt-api-model" value="deepseek-chat" placeholder="模型名称" style="flex:1">
-          <button class="btn btn-sm" id="prompt-fetch-models" style="flex-shrink:0;font-size:12px;padding:8px 10px;width:auto">获取</button>
-        </div>
-        <div id="prompt-model-list" style="display:none;margin-top:6px;max-height:120px;overflow-y:auto;background:var(--bg-card);border:1px solid var(--border-color);border-radius:6px;padding:4px"></div>
-      </label>
-      <div class="confirm-actions" style="flex-direction:column">
-        <button class="btn btn-primary" id="api-prompt-save">保存并开始</button>
-        <button class="btn" id="api-prompt-close" style="color:var(--text-dim);border:none;background:none">取消</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== CONFIRM DIALOG ===== -->
-  <div id="confirm-dialog" class="overlay" style="display:none">
-    <div class="overlay-bg" id="confirm-bg"></div>
-    <div class="confirm-panel">
-      <p class="confirm-text" id="confirm-text">确定要删除此世界吗？</p>
-      <p class="confirm-sub" id="confirm-sub">此操作不可撤销</p>
-      <div class="confirm-actions">
-        <button class="btn btn-danger confirm-yes" id="confirm-yes">删除</button>
-        <button class="btn confirm-no" id="confirm-no">取消</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== PROLOGUE ===== -->
-  <div id="screen-prologue" class="screen">
-    <div class="screen-inner">
-      <div class="prologue-content">
-        <div class="prologue-loader">
-          <div class="spin-ring"></div>
-          <p>命运的齿轮开始转动...</p>
-          <p class="prologue-sub">群星正在排列，世界正在成形</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== PLAY ===== -->
-  <div id="screen-play" class="screen">
-    <div class="play-header">
-      <span class="play-chapter" id="play-chapter">第1章 · 铁棺苏醒</span>
-      <button class="play-menu-btn" id="btn-menu">⋯</button>
-    </div>
-
-    <div class="play-story" id="play-story">
-      <div class="story-content" id="story-content"></div>
-      <div class="story-beat" id="story-beat"></div>
-    </div>
-
-    <div class="play-input-area" id="play-input-area" style="display:none">
-      <div class="thinking-bar" id="thinking-bar" style="display:none">
-        <div class="thinking-bar-track">
-          <div class="thinking-bar-fill"></div>
-        </div>
-        <div class="thinking-bar-text">
-          <span class="reasoning-msg" id="reasoning-msg">星穹推演中</span>
-          <span class="reasoning-dots"><span>.</span><span>.</span><span>.</span></span>
-        </div>
-        <div class="thinking-bar-sub" id="reasoning-sub">群星正在排列</div>
-        <div class="thinking-bar-elapsed" id="reasoning-elapsed"></div>
-      </div>
-      <div class="free-input-row">
-        <button class="btn-continue" id="btn-continue">继续 ▶</button>
-        <button class="btn-secondary" id="btn-regenerate">↺</button>
-        <input type="text" class="input free-input" id="free-input" placeholder="自定义行动..." autocomplete="off">
-      </div>
-    </div>
-
-    <div class="play-status" id="play-status">
-      <span class="status-realm" id="status-realm">凡体期</span>
-      <span class="status-sep">·</span>
-      <span class="status-state" id="status-state">轻伤</span>
-      <span class="status-sep">·</span>
-      <span class="status-location" id="status-location">锈铁棺</span>
-      <span class="status-sep">·</span>
-      <span class="status-stats" id="token-stats"></span>
-      <button class="status-toggle" id="status-toggle">▲</button>
-    </div>
-  </div>
-
-  <!-- ===== MENU OVERLAY ===== -->
-  <div id="menu-overlay" class="overlay" style="display:none">
-    <div class="overlay-bg" id="menu-bg"></div>
-    <div class="overlay-panel">
-      <h3>≡ 菜单</h3>
-      <button class="btn overlay-btn" id="menu-outline">📖 故事大纲</button>
-      <button class="btn overlay-btn" id="menu-world">🌍 世界设定</button>
-      <button class="btn overlay-btn" id="menu-stats">📊 Token 统计</button>
-      <button class="btn overlay-btn" id="menu-status">👤 角色状态</button>
-      <button class="btn overlay-btn" id="menu-settings">⚙ 设置</button>
-      <button class="btn overlay-btn btn-danger" id="menu-quit">🚪 返回标题</button>
-      <button class="btn overlay-btn" id="menu-close">关闭</button>
-    </div>
-  </div>
-
-  <!-- ===== WORLD INFO PANEL ===== -->
-  <div id="world-info-overlay" class="overlay" style="display:none">
-    <div class="overlay-bg" id="world-info-bg"></div>
-    <div class="world-info-panel">
-      <div class="world-info-header">
-        <h3>🌍 世界设定</h3>
-        <button class="btn-back" id="world-info-close">✕</button>
-      </div>
-      <div class="world-info-body" id="world-info-body"></div>
-    </div>
-  </div>
-
-  <!-- ===== STATS PANEL ===== -->
-  <div id="stats-overlay" class="overlay" style="display:none">
-    <div class="overlay-bg" id="stats-bg"></div>
-    <div class="world-info-panel">
-      <div class="world-info-header">
-        <h3>📊 Token 统计</h3>
-        <button class="btn-back" id="stats-close">✕</button>
-      </div>
-      <div class="world-info-body" id="stats-body"></div>
-    </div>
-  </div>
-
+  <footer>
+    <span data-i18n="footerLeft"></span>
+    <span>
+      <a href="https://github.com/cocotyty" target="_blank" rel="noopener">GITHUB @COCOTYTY</a>
+      · <a href="https://github.com/cocotyty/dpig" target="_blank" rel="noopener">DPIG ★45</a>
+    </span>
+  </footer>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="js/starfield.js"></script>
-<script src="js/store.js"></script>
-<script src="js/dice.js"></script>
-<script src="js/pacing.js"></script>
-<script src="js/message-store.js"></script>
-<script src="js/token-stats.js"></script>
-<script src="js/writing-styles.js"></script>
-<script src="js/llm.js"></script>
-<script src="js/app.js"></script>
+<script>
+/* ============================================================
+ * i18n:浏览器语言自动探测 + 手动切换(localStorage 记忆)
+ * ============================================================ */
+'use strict';
+
+const I18N = {
+  zh: {
+    title: 'cocotyty · 像素游戏廊',
+    bio: 'Intel 软件工程师,目前在做 <b>LLM × Xeon 服务器 HeadNode 推理优化</b>,之前深耕<b>云原生</b>。<br>这里是我的 Vibe Game 游戏廊——和 AI 结对写的一些小游戏,<b>零依赖、浏览器直接玩</b>。',
+    chipRepos: '公开仓库', chipFollowers: '关注者',
+    secTitle: '☠ VIBE 游 戏 廊',
+    tdName: '魂火守卫', tdSub: 'SOULFIRE DEFENSE',
+    tdDesc: '像素暗黑塔防:夜幕下的怪物军团涌向最后的魂火。8 关 94 波、8 种可升级塔、9 种恐怖怪物与旧日支配者 Boss。',
+    tdTags: ['塔防','像素暗黑','8 种塔','Boss 战','触屏适配'],
+    vgName: '钢铁先锋', vgSub: 'STEEL VANGUARD',
+    vgDesc: '魂斗罗 × 合金弹风横版跑打:丛林抢滩 → 废墟市区 → 要塞核心,三次任务、三个 Boss,终结钢铁军团的战争。',
+    vgTags: ['横版射击','3 关 3 Boss','虚拟手柄','离线可玩'],
+    chName: '星穹编年史', chSub: 'STARRY VOID',
+    chDesc: '不是游戏,是造世界的骰子:掷出宇宙常数与文明纪元,让 AI 在群星之间为你写下整部编年史。',
+    chTags: ['AI 写作','世界生成','星野动画','实验项目'],
+    goGame: '▶ 进入游戏', goApp: '▶ 进入应用',
+    footerLeft: '© 2026 COCOTYTY · 原生 CANVAS 打造 · 零依赖',
+    btnLabel: 'EN'
+  },
+  en: {
+    title: 'cocotyty · vibe game gallery',
+    bio: 'Software engineer at Intel, currently optimizing <b>LLM inference on Xeon-server head nodes</b>; previously deep in <b>cloud native</b>.<br>This is my vibe game arcade — small games pair-built with AI, <b>zero deps, playable right in the browser</b>.',
+    chipRepos: 'repos', chipFollowers: 'followers',
+    secTitle: '☠ VIBE GAME ARCADE',
+    tdName: 'Soulfire Defense', tdSub: '魂火守卫',
+    tdDesc: 'Pixel-dark tower defense: monster legions march on the last soulfire. 8 stages, 94 waves, 8 upgradeable towers, 9 horrors — and the Old One boss.',
+    tdTags: ['Tower Defense','Pixel Dark','8 Towers','Boss Fight','Touch Ready'],
+    vgName: 'Steel Vanguard', vgSub: '钢铁先锋',
+    vgDesc: 'Contra × Metal Slug run & gun: beach assault → ruined city → fortress core. Three missions, three bosses. End the steel legion\'s war.',
+    vgTags: ['Run & Gun','3 Stages 3 Bosses','Gamepad','Offline'],
+    chName: 'Starry Void', chSub: '星穹编年史',
+    chDesc: 'Not a game — a world-building die: roll cosmic constants and eras, then let AI chronicle a whole universe among the stars.',
+    chTags: ['AI Writing','Worldgen','Starfield','Experiment'],
+    goGame: '▶ PLAY NOW', goApp: '▶ OPEN APP',
+    footerLeft: '© 2026 COCOTYTY · VANILLA CANVAS · ZERO DEPS',
+    btnLabel: '中文'
+  }
+};
+
+const Lang = {
+  cur: 'zh',
+  detect(){
+    try{
+      const saved = localStorage.getItem('gallery-lang');
+      if(saved === 'zh' || saved === 'en') return saved;
+      const nav = (navigator.language || (navigator.languages||[''])[0] || '').toLowerCase();
+      return nav.startsWith('zh') ? 'zh' : 'en';
+    }catch(e){ return 'zh'; }
+  },
+  apply(lang){
+    this.cur = lang;
+    const d = I18N[lang];
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    document.title = d.title;
+    document.querySelectorAll('[data-i18n]').forEach(el=>{
+      const k = el.getAttribute('data-i18n');
+      if(d[k] !== undefined) el.innerHTML = d[k];
+    });
+    document.querySelectorAll('[data-i18n-tags]').forEach(el=>{
+      const k = el.getAttribute('data-i18n-tags');
+      el.innerHTML = (d[k]||[]).map(t=>'<span class="tag">'+t+'</span>').join('');
+    });
+    document.getElementById('lang-btn').textContent = d.btnLabel;
+    try{ localStorage.setItem('gallery-lang', lang); }catch(e){}
+  },
+  toggle(){ this.apply(this.cur === 'zh' ? 'en' : 'zh'); }
+};
+Lang.apply(Lang.detect());
+document.getElementById('lang-btn').addEventListener('click', ()=>Lang.toggle());
+
+/* ============================================================
+ * Gallery 缩略图动画(复用各游戏自己的像素素材,内联精简版)
+ * ============================================================ */
+
+function mk(rows, pal, scale){
+  const h = rows.length, w = Math.max(...rows.map(r=>r.length));
+  const cv = document.createElement('canvas');
+  cv.width = w*(scale||1); cv.height = h*(scale||1);
+  const c = cv.getContext('2d');
+  for(let y=0;y<h;y++) for(let x=0;x<rows[y].length;x++){
+    const ch = rows[y][x];
+    if(ch==='.'||ch===' ') continue;
+    c.fillStyle = pal[ch] || '#f0f';
+    c.fillRect(x*(scale||1), y*(scale||1), scale||1, scale||1);
+  }
+  return cv;
+}
+function bgFill(c, w, h, top, bottom){
+  const g = c.createLinearGradient(0,0,0,h);
+  g.addColorStop(0, top); g.addColorStop(1, bottom);
+  c.fillStyle = g; c.fillRect(0,0,w,h);
+}
+
+/* ============ 卡1:魂火守卫 ============ */
+(function(){
+  const cv = document.querySelector('#card-td canvas');
+  const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+  const W = 128, H = 72;
+  const PAL = {k:'#0b0b12',G:'#567d3e',F:'#3a5a2a',e:'#ff2e2e',w:'#e8e2cf',d:'#26262f',
+    M:'#a3b4c4',q:'#17171f',S:'#67616f',s:'#4a4551',u:'#5f4426',U:'#8a6134',
+    C:'#dff7ff',c:'#8fd4e8',m:'#6f7d8c'};
+  const zombie = mk([
+    '....kkkk....','...kGGGGk...','..kGGGGGGk..','..kGeGGeGk..','..kGGGGGGk..',
+    '...kwkwkw...','..kkddddkk..','.kGdddddGk..','.kGdbbddGk..','..kddddddk..',
+    '...kddddk...','..kFF..FFk..','..kFF..FFk..','..kk....kk..'], PAL);
+  const tower = mk([
+    '..kkkkkkkkkkkk..','..kMMMMMMMMMMk..','....kkmkkmkk....','......kuuk......',
+    '......kuuk......','.....kkqqkk.....','....kuqqqquk....','....kuuqquuk....',
+    '...kSuuqquuSk...','...kSuuuuuuSk...','...ksuukkuusk...','..ksssuuuusssk..',
+    '..kssssssssssk..','..kqqqqqqqqqqk..'], PAL);
+  const bonfire = mk([
+    '...uuuqqqquuu...','..kquuqqqquuqk..','.ksqqquuuqqqsk..',
+    'kssqqqqqqqqqssk.','kqqqqqqqqqqqqqqk'], PAL);
+  const flames = [
+    mk(['....CC....','...CCCC...','...cCCc...','..ccCCcc..','..ccCCcc..','.cccCCccc.',
+       '.cccCCccc.','.cccCCccc.','..cccccc..','..cccccc..','..cccccc..'], PAL),
+    mk(['.....C....','....CCC...','...cCCc...','..ccCCcc..','.cccCCcc..','.cccCCccc.',
+       '..ccCCccc.','.cccCCccc.','..cccccc..','...cccc...','...cccc...'], PAL),
+    mk(['....C.....','...CCC....','...cCCc...','..ccCCcc..','..ccCCccc.','.cccCCccc.',
+       '.cccCCcc..','.cccCCccc.','..cccccc..','...cccc...','..cccccc..'], PAL)
+  ];
+  let zt = 0, zx = -14, arrowX = -10, arrowOn = false, cool = 0;
+  function draw(t){
+    bgFill(c, W, H, '#1a2030', '#232818');
+    c.fillStyle = '#2f3226'; c.fillRect(0, 46, W, 26);
+    c.fillStyle = '#4a4132'; c.fillRect(0, 56, W, 8);
+    c.fillStyle = '#5a4f3c';
+    for(let x=0;x<W;x+=7) c.fillRect(x, 58+((x*7)%3), 3, 2);
+    c.fillStyle = '#ffffff';
+    for(let i=0;i<18;i++){
+      const sx = (i*37)%W, sy = (i*23)%40;
+      if((t/400+i)%7<5) c.fillRect(sx, sy, 1, 1);
+    }
+    c.fillStyle = '#f2cf46'; c.fillRect(108, 8, 8, 8);
+    c.fillStyle = '#1a2030'; c.fillRect(105, 6, 6, 6);
+    c.drawImage(tower, 52, 34);
+    zt += 1;
+    zx += 0.18;
+    if(zx > 96) zx = -14;
+    const bob = -Math.abs(Math.sin(zt*0.08))*1;
+    c.drawImage(zombie, Math.round(zx), Math.round(46-zombie.height+bob));
+    cool--;
+    if(arrowOn){ arrowX += 2.2; if(arrowX > 118) arrowOn = false; }
+    else if(cool <= 0){ arrowOn = true; arrowX = 68; cool = 55; }
+    if(arrowOn){ c.fillStyle = '#e8e2cf'; c.fillRect(Math.round(arrowX), 38, 4, 1); }
+    c.drawImage(bonfire, 104, 61);
+    const fi = Math.floor(t/130)%3;
+    c.drawImage(flames[fi], 106, 61-flames[fi].height);
+    c.fillStyle = '#dff7ff';
+    if(Math.random()<0.3) c.fillRect(108+Math.round(Math.random()*6), 44-Math.round(Math.random()*6), 1, 1);
+  }
+  window.__tdDraw = draw;
+})();
+
+/* ============ 卡2:钢铁先锋 ============ */
+(function(){
+  const cv = document.querySelector('#card-vg canvas');
+  const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+  const W = 128, H = 72;
+  const pal = {K:'#141824',O:'#5c6e3c',o:'#89a15e',S:'#e8b98d',V:'#ff8c1a',
+    G:'#23262e',g:'#4a5160',B:'#2c3038',P:'#6a4a30',W:'#dfe6ee',
+    N:'#3d4350',n:'#5a6274',R:'#f5c542'};
+  const legs = mk([
+    "..KKKK....KKKK..",".KOOOK....KOOOK.",".KOKOK....KOKOK.",".KOKOK....KOKOK.",
+    ".KOKSKKKKKKSKOK.",".KBBK......KBBK.",".KBBK......KBBK.",
+    ".KBBBK....KBBBK.",".KKKKK....KKKKK."], pal);
+  const torso = mk([
+    "......KKKKKK",".....KOOOOOOK","....KOOOOOOOOK","....KOOOOOSSSK","....KOVVVVSSSK",
+    "....KOOOOOSSSK",".....KOOOSSSK","....KKOOOOOKK","...KKKOOOOOKKK","..KPPKOOOOOKPPK",
+    ".KPPKOoOoOOKSSKGGGGGGGGGGGW",".KPPK.OoOoOKSSGGGGGGGGGGGG.","..KKK.KGGGK",
+    "....KOOOOOOK",".....KKKKK"], pal);
+  const grunts = [
+    mk([".....KKKKKK","....KNNNNNNK","....KRRRRRNK","....KNNNSSSK","....KNnSSSK",
+       ".....KNSSSK","....KKNNNNKK","...KKNNNNNNKK","..KNKNNnNNKNKGGG","..KNK.NNnN.KSSGG",
+       "..KNK.NNnN.KGGGG","..KKK.NNnN.KKK",".....NNnNN","....NNNNNNN","....KNNK.KNNK",
+       "....KNNK.KNNK","...KNNK...KNNK","...KNNK...KNNK","...KGGK...KGGK",
+       "..KGGGK...KGGGK","..KKKKK...KKKKK"], pal),
+    mk([".....KKKKKK","....KNNNNNNK","....KRRRRRNK","....KNNNSSSK","....KNnSSSK",
+       ".....KNSSSK","....KKNNNNKK","...KKNNNNNNKK","..KNKNNnNNKNKGGG","..KNK.NNnN.KSSGG",
+       "..KNK.NNnN.KGGGG","..KKK.NNnN.KKK",".....NNnNN","....NNNNNNN",".....KNNNKK",
+       ".....KNNKNNK","....KNNK.KNNK","....KGGK..KGGK","...KGGGK..KGGK","...KKKKK..KKKKK"], pal)
+  ];
+  let gx = 130, muzzle = 0, bullets = [], ft = 0;
+  function draw(t){
+    bgFill(c, W, H, '#101822', '#1a2418');
+    c.fillStyle = '#16202c';
+    for(let x=0;x<W;x++){
+      const hh = 20 + Math.round(8*Math.sin(x*0.07) + 5*Math.sin(x*0.19+2));
+      c.fillRect(x, 44-hh, 1, hh);
+    }
+    c.fillStyle = '#cfe6ff';
+    for(let i=0;i<14;i++){
+      if((t/350+i)%6<4) c.fillRect((i*29+7)%W, (i*17+3)%26, 1, 1);
+    }
+    c.fillStyle = '#243018'; c.fillRect(0, 44, W, 28);
+    c.fillStyle = '#31401f';
+    for(let x=0;x<W;x+=9) c.fillRect(x + (x%3), 50+(x%5), 4, 2);
+    c.drawImage(legs, 14, 44-legs.height);
+    c.drawImage(torso, 9, 44-legs.height-torso.height+2);
+    ft++;
+    if(ft % 34 === 0){ muzzle = 5; }
+    if(muzzle > 0){
+      muzzle--;
+      c.fillStyle = '#ffe66e';
+      c.fillRect(36, 25, 5, 3); c.fillRect(41, 26, 2, 1);
+      c.fillStyle = '#fff';
+      if(bullets.length < 6) bullets.push(40);
+    }
+    c.fillStyle = '#ffe66e';
+    for(let i=bullets.length-1;i>=0;i--){
+      bullets[i] += 3.2;
+      if(bullets[i] > 130){ bullets.splice(i,1); continue; }
+      c.fillRect(Math.round(bullets[i]), 26, 4, 1);
+    }
+    gx -= 0.14; if(gx < 78) gx = 130;
+    const gf = grunts[Math.floor(t/180)%2];
+    const gb = -Math.abs(Math.sin(t/130))*1;
+    c.drawImage(gf, Math.round(gx), Math.round(44-gf.height+gb));
+    c.fillStyle = '#f5c542';
+    if(ft%34===2) c.fillRect(30, 42, 1, 1);
+  }
+  window.__vgDraw = draw;
+})();
+
+/* ============ 卡3:星穹编年史 ============ */
+(function(){
+  const cv = document.querySelector('#card-ch canvas');
+  const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+  const W = 128, H = 72;
+  const stars = [];
+  for(let i=0;i<42;i++) stars.push({
+    x: Math.random()*W, y: Math.random()*H,
+    s: Math.random()<0.2?2:1, ph: Math.random()*6.28, v: 0.5+Math.random()*1.5
+  });
+  const pal = {k:'#0b0b12',C:'#dff7ff',c:'#8fd4e8',p:'#8e5bb0',P:'#c98ef0',
+    u:'#5f4426',U:'#8a6134',W:'#f8f4e8',n:'#cfc39b'};
+  const book = mk([
+    '..kkkkkkkkkk..','.kUUUUUUUUUUk.','.kUqqqqqqqqUk.','.kUqnnnnnnqUk.',
+    '.kUqnCCnnqnUk.','.kUqnnnnnnqUk.','.kUqnPnnnnqUk.','.kUqnnnnnnqUk.',
+    '.kUqqqqqqqqUk.','.kUUUUUUUUUUk.','.kkkkkkkkkkkk.',
+    '....kUUUUk....','...kUUUUUUk...','...kqqqqqqk...','...kkkkkkkk...'], pal);
+  const dice = mk([
+    '...kkkk...','..kPPPPk..','.kPqPPqPk.','.kPPPPPPk.','.kPqPPqPk.',
+    '.kPPPPPPk.','.kPqPPqPk.','.kPPPPPPk.','..kPPPPk..','...kkkk...'], pal);
+  function draw(t){
+    bgFill(c, W, H, '#070710', '#101024');
+    for(const s of stars){
+      const a = 0.3 + 0.7*Math.abs(Math.sin(t/700*s.v + s.ph));
+      c.globalAlpha = a;
+      c.fillStyle = s.s===2 ? '#dff7ff' : '#8fa8d0';
+      c.fillRect(Math.round(s.x), Math.round(s.y), s.s, s.s);
+    }
+    c.globalAlpha = 1;
+    const cx = 64, cy = 34;
+    c.fillStyle = '#f2cf46';
+    const r = 2 + Math.sin(t/500)*0.8;
+    c.fillRect(cx-1, cy-r*2, 2, r*4); c.fillRect(cx-r*2, cy-1, r*4, 2);
+    const by = 40 + Math.sin(t/800)*2;
+    c.drawImage(book, 44, Math.round(by));
+    c.drawImage(dice, 80, Math.round(by+3+Math.sin(t/600)*2));
+    const g = c.createRadialGradient(cx, cy, 2, cx, cy, 40);
+    g.addColorStop(0, 'rgba(142,91,176,0.25)');
+    g.addColorStop(1, 'rgba(142,91,176,0)');
+    c.fillStyle = g; c.fillRect(0,0,W,H);
+    const mt = (t % 3000) / 3000;
+    if(mt < 0.25){
+      const mx = 20 + mt*400, my = 8 + mt*70;
+      c.fillStyle = '#fff';
+      c.fillRect(Math.round(mx), Math.round(my), 2, 1);
+      c.fillStyle = '#8fa8d0';
+      c.fillRect(Math.round(mx)-3, Math.round(my)-1, 3, 1);
+    }
+  }
+  window.__chDraw = draw;
+})();
+
+/* ============ 统一动画循环 ============ */
+(function loop(){
+  const t = performance.now();
+  window.__tdDraw && window.__tdDraw(t);
+  window.__vgDraw && window.__vgDraw(t);
+  window.__chDraw && window.__chDraw(t);
+  requestAnimationFrame(loop);
+})();
+</script>
 </body>
 </html>

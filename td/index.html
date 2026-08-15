@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a10">
+<title>魂火守卫 SOULFIRE DEFENSE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== 主菜单 ===== -->
+  <div class="screen" id="scr-menu">
+    <div class="menu-inner">
+      <canvas id="menu-fire" width="96" height="96"></canvas>
+      <h1 class="game-title">魂火守卫</h1>
+      <div class="game-sub">SOULFIRE&nbsp;DEFENSE</div>
+      <p class="tagline">夜幕降临,噩梦如潮水涌来。<br>守住最后的魂火 —— 别让它熄灭。</p>
+      <div class="menu-btns">
+        <button class="btn btn-lg btn-blood" id="btn-start">开始守卫</button>
+        <button class="btn btn-lg" id="btn-levels">选择关卡</button>
+      </div>
+      <div class="menu-foot">
+        <button class="btn btn-sm" id="btn-mute">♪ 音效:开</button>
+        <button class="btn btn-sm" id="btn-reset">重置进度</button>
+      </div>
+      <div class="menu-ver">PIXEL DARK TOWER DEFENSE · v1.0</div>
+    </div>
+  </div>
+
+  <!-- ===== 关卡选择 ===== -->
+  <div class="screen hidden" id="scr-levels">
+    <div class="levels-inner">
+      <h2 class="scr-title">— 选择战场 —</h2>
+      <div id="level-grid"></div>
+      <button class="btn" id="btn-back-menu">← 返回</button>
+    </div>
+  </div>
+
+  <!-- ===== 游戏界面 ===== -->
+  <div class="screen hidden" id="scr-game">
+    <div id="hud">
+      <button id="btn-pause" class="icon-btn" title="暂停">❚❚</button>
+      <div class="hud-stat hp" id="hud-hp" title="魂火生命">🔥<span>10</span></div>
+      <div class="hud-stat gold" id="hud-gold" title="金币">◉<span>0</span></div>
+      <div class="hud-stat wave" id="hud-wave" title="波次">☠<span>0/0</span></div>
+      <div class="hud-spacer"></div>
+      <button id="btn-callwave" class="btn btn-sm btn-wave hidden">下一波 ▶</button>
+      <button id="btn-speed" class="icon-btn" title="游戏速度">×1</button>
+      <button id="btn-fs" class="icon-btn" title="全屏/横屏">⛶</button>
+      <button id="btn-mute2" class="icon-btn" title="音效">♪</button>
+    </div>
+    <div id="board-wrap">
+      <canvas id="board"></canvas>
+      <div id="vignette"></div>
+      <div id="scanlines"></div>
+      <div id="wave-banner" class="hidden"></div>
+      <div id="ctx-panel" class="hidden"></div>
+      <div id="build-confirm" class="hidden">
+        <div class="bc-title"></div>
+        <div class="prow">
+          <button class="btn up" id="bc-ok">✓ 建造</button>
+          <button class="btn sell" id="bc-no">✕ 取消</button>
+        </div>
+      </div>
+      <div id="toast" class="hidden"></div>
+    </div>
+    <div id="shop-bar">
+      <div id="shop"></div>
+    </div>
+  </div>
+
+  <!-- ===== 模态框 ===== -->
+  <div id="modal" class="hidden">
+    <div id="modal-box"></div>
+  </div>
+
+<script>
+/* 调试:收集运行时错误 */
+window.__errs = [];
+window.addEventListener('error', function(e){
+  window.__errs.push((e.message||'error') + ' @' + (e.filename||'').split('/').pop() + ':' + (e.lineno||0));
+});
+</script>
+</div>
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
