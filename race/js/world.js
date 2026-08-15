@@ -15,18 +15,28 @@ const World = (() => {
   const SHOULDER_OUT = 8.1;                    // 硬路肩外沿
   const SEG = 5, SEGN = 96;                    // 路面条带:5m × 96 段
   const VIEW = 430;                            // 景物生成视距
-  const DAY_LEN = 2200, DAY_START = 0.34;      // 昼夜周期,起步=黄昏
+  const DAY_LEN = 10000, DAY_START = 0.34;     // 昼夜周期(米/天),起步=午后
 
-  /* ---------- 中心线(叠加正弦的缓弯) ---------- */
+  /* ---------- 中心线(四重正弦弯道:慢漂 + 中弯 + 急弯) ----------
+   * 最小曲率半径 ~560m,最大偏航 ~12°,260m 视距内走向变化可达 ~25° */
   function cx(s) {
-    return 26 * Math.sin(s * 0.0009) +
+    return 24 * Math.sin(s * 0.0009) +
            14 * Math.sin(s * 0.0021 + 1.7) +
-            7 * Math.sin(s * 0.0041 + 4.2);
+            8 * Math.sin(s * 0.0043 + 4.2) +
+           10 * Math.sin(s * 0.0125 + 2.6);
   }
   function dcx(s) {
-    return 26 * 0.0009 * Math.cos(s * 0.0009) +
+    return 24 * 0.0009 * Math.cos(s * 0.0009) +
            14 * 0.0021 * Math.cos(s * 0.0021 + 1.7) +
-            7 * 0.0041 * Math.cos(s * 0.0041 + 4.2);
+            8 * 0.0043 * Math.cos(s * 0.0043 + 4.2) +
+           10 * 0.0125 * Math.cos(s * 0.0125 + 2.6);
+  }
+  /* 曲率(≈cx''):正 = 右弯;main.js 用作离心甩出与车身侧倾 */
+  function d2cx(s) {
+    return -(24 * 0.0009 * 0.0009) * Math.sin(s * 0.0009)
+         - (14 * 0.0021 * 0.0021) * Math.sin(s * 0.0021 + 1.7)
+         - ( 8 * 0.0043 * 0.0043) * Math.sin(s * 0.0043 + 4.2)
+         - (10 * 0.0125 * 0.0125) * Math.sin(s * 0.0125 + 2.6);
   }
   /* 行进方向朝 -Z 的偏航角 */
   function yawAt(s) { return Math.atan2(-dcx(s), 1); }
@@ -620,7 +630,7 @@ const World = (() => {
   }
 
   return {
-    init, update, cx, yawAt, zoneAt, zoneWeights, LANES, LANE_W,
+    init, update, cx, yawAt, curveAt: d2cx, zoneAt, zoneWeights, LANES, LANE_W,
     ROAD_HALF, SHOULDER_OUT, glowTex,
     get nightFactor() { return nightFactor; }
   };

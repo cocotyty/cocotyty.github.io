@@ -147,11 +147,15 @@ canvas#game3d{position:fixed;inset:0;width:100%;height:100%;display:block}
 @media (pointer:coarse){ #touch-ui{display:block} }
 .pad-left{position:absolute;left:calc(14px + env(safe-area-inset-left));
   bottom:calc(14px + env(safe-area-inset-bottom));display:flex;gap:12px}
+.pad-right{position:absolute;right:calc(14px + env(safe-area-inset-right));
+  bottom:calc(14px + env(safe-area-inset-bottom));display:flex;gap:12px}
 .pad-btn{pointer-events:auto;font-size:22px;color:var(--text);background:rgba(22,22,34,.72);
   border:2px solid var(--line2);width:76px;height:76px;box-shadow:0 5px 0 #000;backdrop-filter:blur(2px)}
 .pad-btn:active,.pad-btn.on{background:rgba(242,207,70,.25);border-color:var(--gold);transform:translateY(4px);box-shadow:0 1px 0 #000}
-.pad-brake{position:absolute;right:calc(14px + env(safe-area-inset-right));
-  bottom:calc(14px + env(safe-area-inset-bottom));font-size:26px;border-color:#7a2a26}
+.pad-gas{font-size:26px;border-color:#7a4a10}
+.pad-gas:active,.pad-gas.on{background:rgba(255,140,26,.3);border-color:var(--orange)}
+.pad-brake{font-size:26px;border-color:#7a2a26}
+.pad-brake:active,.pad-brake.on{background:rgba(255,59,48,.28);border-color:var(--blood)}
 @media (max-height:420px){ .pad-btn{width:64px;height:64px;font-size:19px} }
 
 /* ---------- 暂停 / 结算 ---------- */

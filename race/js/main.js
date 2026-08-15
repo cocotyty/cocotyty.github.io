@@ -16,7 +16,7 @@ const I18N = {
     bestLabel: '最长里程', start: '▶ 出发!',
     stSpeed: '极速', stAccel: '加速', stHand: '操控', stHp: '耐久',
     helpDesktop: '⌨ ← → / A D 转向 · ↑ / W 油门 · ↓ / S 刹车<br>自动巡航,道具即时生效,撞车掉血',
-    helpTouch: '📱 ◀ ▶ 转向 · 🛑 刹车 · 自动油门<br>谨防逆行车辆与横穿马路的行人',
+    helpTouch: '📱 ◀ ▶ 转向 · ⚡ 油门 · 🛑 刹车 · 谨防逆行车辆与横穿马路的行人',
     paused: '暂停', resume: '▶ 继续', quit: '← 返回车库',
     gameOver: 'GAME OVER', newRecord: '新纪录!', retry: '再来一局', changeCar: '换车',
     soundOn: '音效:开', soundOff: '音效:关',
@@ -32,7 +32,7 @@ const I18N = {
     bestLabel: 'Best distance', start: '▶ DRIVE!',
     stSpeed: 'Speed', stAccel: 'Accel', stHand: 'Handling', stHp: 'Durability',
     helpDesktop: '⌨ ← → / A D steer · ↑ / W throttle · ↓ / S brake<br>Auto-cruise, instant power-ups, collisions cost HP',
-    helpTouch: '📱 ◀ ▶ steer · 🛑 brake · auto throttle<br>Beware wrong-way drivers & jaywalking pedestrians',
+    helpTouch: '📱 ◀ ▶ steer · ⚡ throttle · 🛑 brake<br>Beware wrong-way drivers & jaywalking pedestrians',
     paused: 'PAUSED', resume: '▶ RESUME', quit: '← GARAGE',
     gameOver: 'GAME OVER', newRecord: 'NEW RECORD!', retry: 'RETRY', changeCar: 'GARAGE',
     soundOn: 'Sound: ON', soundOff: 'Sound: OFF',
@@ -566,6 +566,8 @@ const Game = (() => {
     const steerIn = (input.left ? -1 : 0) + (input.right ? 1 : 0);
     p.steer = lerp(p.steer, steerIn, 1 - Math.exp(-dt * 9));
     p.l += p.steer * def.handling * dt;
+    /* 弯道离心:高速过弯被甩向弯外,需打反向修正 */
+    p.l -= p.speed * p.speed * World.curveAt(p.s) * 0.55 * dt;
 
     /* 纵向:自动巡航 / 全油门 / 刹车 / 涡轮 */
     const D = difficulty();
@@ -621,7 +623,8 @@ const Game = (() => {
     const g = p.model.group;
     g.position.set(World.cx(p.s) + p.l, 0, 0);
     g.rotation.y = World.yawAt(p.s) + p.steer * 0.1;
-    g.rotation.z = -p.steer * 0.09;
+    const lean = clamp(p.speed * p.speed * World.curveAt(p.s) * 0.012, -0.1, 0.1);
+    g.rotation.z = -p.steer * 0.09 + lean;
     if (offroad) g.position.y = Math.abs(Math.sin(elapsed * 30)) * 0.06;
 
     /* 车轮 */
@@ -1029,6 +1032,7 @@ const Game = (() => {
     bindPad('pad-left-btn', 'left');
     bindPad('pad-right-btn', 'right');
     bindPad('pad-brake', 'down');
+    bindPad('pad-gas', 'up');
 
     /* 全局手势:解锁音频 + 阻止页面滚动 */
     document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });

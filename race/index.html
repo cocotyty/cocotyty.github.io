@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
@@ -41,7 +41,7 @@
       <div class="veh-grid" id="veh-grid"></div>
       <div class="menu-foot">
         <button class="btn btn-sm" id="btn-mute">♪ <span data-i18n="soundOn"></span></button>
-        <span class="ver">3D ENDLESS RACER · v1.0</span>
+        <span class="ver">3D ENDLESS RACER · v1.1</span>
       </div>
     </div>
     <div class="menu-right">
@@ -95,7 +95,10 @@
       <button class="pad-btn" id="pad-left-btn">◀</button>
       <button class="pad-btn" id="pad-right-btn">▶</button>
     </div>
-    <button class="pad-btn pad-brake" id="pad-brake">🛑</button>
+    <div class="pad-right">
+      <button class="pad-btn pad-gas" id="pad-gas">⚡</button>
+      <button class="pad-btn pad-brake" id="pad-brake">🛑</button>
+    </div>
   </div>
 </div>
 
@@ -128,9 +131,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"
         onerror="document.getElementById('engine-error').classList.remove('hidden')"></script>
-<script src="js/audio.js?v=1"></script>
-<script src="js/vehicles.js?v=1"></script>
-<script src="js/world.js?v=1"></script>
-<script src="js/main.js?v=1"></script>
+<script src="js/audio.js?v=2"></script>
+<script src="js/vehicles.js?v=2"></script>
+<script src="js/world.js?v=2"></script>
+<script src="js/main.js?v=2"></script>
 </body>
 </html>
