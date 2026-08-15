@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a10">
+<meta name="description" content="狂飙公路 TURBO HIGHWAY — 3D 无尽公路赛车:6 种车辆、道具、逆行疯狂车流、昼夜循环,横屏双端可玩">
+<title>狂飙公路 TURBO HIGHWAY</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<canvas id="game3d"></canvas>
+<div id="fx-vignette"></div>
+
+<!-- ===== 竖屏提示 ===== -->
+<div id="rotate-overlay">
+  <div class="rotate-icon">📱</div>
+  <div class="rotate-txt" data-i18n="rotate"></div>
+</div>
+
+<!-- ===== 3D 引擎加载失败 ===== -->
+<div id="engine-error" class="hidden">
+  <div class="err-inner" data-i18n="engineErr"></div>
+</div>
+
+<!-- ===== 主菜单 ===== -->
+<div class="screen" id="scr-menu">
+  <div class="menu-panel">
+    <div class="menu-left">
+      <h1 class="game-title">狂飙公路</h1>
+      <div class="game-sub">TURBO&nbsp;HIGHWAY</div>
+      <p class="tagline" data-i18n="tagline"></p>
+      <div class="best-line">🏆 <span data-i18n="bestLabel"></span> <b id="menu-best">0 m</b></div>
+      <div class="veh-grid" id="veh-grid"></div>
+      <div class="menu-foot">
+        <button class="btn btn-sm" id="btn-mute">♪ <span data-i18n="soundOn"></span></button>
+        <span class="ver">3D ENDLESS RACER · v1.0</span>
+      </div>
+    </div>
+    <div class="menu-right">
+      <div class="showcase-card">
+        <div class="show-emoji" id="sel-emoji">🚗</div>
+        <div class="show-name" id="sel-name">—</div>
+        <div class="show-sub" id="sel-sub">—</div>
+        <div class="stat-rows">
+          <div class="stat-row"><span data-i18n="stSpeed"></span><div class="stat-bar"><i id="st-speed"></i></div></div>
+          <div class="stat-row"><span data-i18n="stAccel"></span><div class="stat-bar"><i id="st-accel"></i></div></div>
+          <div class="stat-row"><span data-i18n="stHand"></span><div class="stat-bar"><i id="st-hand"></i></div></div>
+          <div class="stat-row"><span data-i18n="stHp"></span><div class="stat-bar"><i id="st-hp"></i></div></div>
+        </div>
+        <div class="veh-best" id="sel-best"></div>
+      </div>
+      <button class="btn btn-lg btn-gold" id="btn-start" data-i18n="start"></button>
+      <div class="help-txt" data-i18n="helpDesktop"></div>
+      <div class="help-txt touch-only" data-i18n="helpTouch"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== HUD ===== -->
+<div class="screen hidden" id="scr-hud">
+  <div class="hud-tl">
+    <div class="hp-wrap">
+      <span class="hp-icon">❤</span>
+      <div class="hp-bar"><i id="hp-fill"></i></div>
+      <span class="hp-num" id="hp-num">100</span>
+    </div>
+    <div class="fx-chips">
+      <span class="fx-chip fx-shield hidden" id="fx-shield">🛡 <b id="fx-shield-t">0</b></span>
+      <span class="fx-chip fx-turbo hidden" id="fx-turbo">⚡ <b id="fx-turbo-t">0</b></span>
+    </div>
+  </div>
+  <div class="hud-tc">
+    <div class="dist" id="hud-dist">0 m</div>
+    <div class="best-small">🏆 <span id="hud-best">0 m</span></div>
+    <div class="warn hidden" id="hud-warn"></div>
+  </div>
+  <div class="hud-tr">
+    <div class="speedo"><b id="hud-speed">0</b><span class="kmh">km/h</span></div>
+    <div class="hud-btns">
+      <button class="icon-btn" id="btn-pause" title="pause">❚❚</button>
+    </div>
+  </div>
+  <div id="toasts"></div>
+  <!-- 触屏控件 -->
+  <div id="touch-ui">
+    <div class="pad-left">
+      <button class="pad-btn" id="pad-left-btn">◀</button>
+      <button class="pad-btn" id="pad-right-btn">▶</button>
+    </div>
+    <button class="pad-btn pad-brake" id="pad-brake">🛑</button>
+  </div>
+</div>
+
+<!-- ===== 暂停 ===== -->
+<div class="screen hidden" id="scr-pause">
+  <div class="pause-inner">
+    <h2 class="scr-title" data-i18n="paused"></h2>
+    <button class="btn btn-lg" id="btn-resume" data-i18n="resume"></button>
+    <button class="btn" id="btn-quit" data-i18n="quit"></button>
+  </div>
+</div>
+
+<!-- ===== 结算 ===== -->
+<div class="screen hidden" id="scr-over">
+  <div class="over-inner">
+    <h2 class="scr-title" data-i18n="gameOver"></h2>
+    <div class="new-record hidden" id="over-newrec">★ <span data-i18n="newRecord"></span> ★</div>
+    <div class="over-dist"><span id="over-dist">0</span> m</div>
+    <div class="over-stats">
+      <span><b id="over-coins">0</b> 🪙</span>
+      <span><b id="over-destroys">0</b> 💥</span>
+      <span>🏆 <b id="over-best">0</b> m</span>
+    </div>
+    <div class="over-btns">
+      <button class="btn btn-lg btn-gold" id="btn-retry" data-i18n="retry"></button>
+      <button class="btn btn-lg" id="btn-garage" data-i18n="changeCar"></button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"
+        onerror="document.getElementById('engine-error').classList.remove('hidden')"></script>
+<script src="js/audio.js?v=1"></script>
+<script src="js/vehicles.js?v=1"></script>
+<script src="js/world.js?v=1"></script>
+<script src="js/main.js?v=1"></script>
+</body>
+</html>
