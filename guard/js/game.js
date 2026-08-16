@@ -132,20 +132,24 @@ const Sfx = (() => {
 })();
 
 /* ================= 常量 ================= */
-const CELL = 2, HALF = 60;            // 网格 2m,地图 120×120
+const CELL = 2, HALF = 78;            // 网格 2m,地图 156×156
 const TOTAL_VILLAGERS = 20;
 const LOSE_DEAD = Math.floor(TOTAL_VILLAGERS / 2) + 1;   // 阵亡 ≥11 即败
-const GATE_X = 57, GATE_Z = 4, GATE_HALF_W = 2.6;
+const GATE_X = 75, GATE_Z = 4, GATE_HALF_W = 2.6;
 
-// 村→城 路径点
+// 村→城 路径点(S 形穿越全图,~183m)
 const PATH = [
-  [-52, 0], [-38, -10], [-24, -2], [-12, 8],
-  [2, 2], [16, -8], [30, -4], [44, 6], [56, GATE_Z]
+  [-72, 0], [-58, -14], [-40, -6], [-26, 12], [-8, 4],
+  [8, -14], [26, -8], [44, 10], [62, 2], [74, GATE_Z]
 ];
 const PATH_LEN = (() => { let s = 0; for (let i = 1; i < PATH.length; i++) s += dist2d(...PATH[i - 1], ...PATH[i]); return s; })();
 
-// 传送门(僵尸出生点):西×3 + 北×2 + 南×2
-const PORTALS = [[-57, -34], [-57, 0], [-57, 34], [-26, -57], [18, -57], [-26, 57], [18, 57]];
+// 传送门(僵尸出生点):西×3 + 北×3 + 南×3
+const PORTALS = [
+  [-75, -40], [-75, 0], [-75, 40],
+  [-48, -75], [0, -75], [48, -75],
+  [-48, 75], [0, 75], [48, 75]
+];
 
 const ZTYPES = {
   walker: { hp: 34, speed: 2.45, dmg: 9, coin: 2, scale: 1.0, atkR: 1.4, chew: 12, skin: 0x5d9455, shirt: 0x2e8b8b, pants: 0x35357a, name: 'walker' },
@@ -155,11 +159,11 @@ const ZTYPES = {
   giant: { hp: 400, speed: 1.1, dmg: 26, coin: 15, scale: 2.25, atkR: 2.6, chew: 42, skin: 0x3d6b3a, shirt: 0x2a2a3a, pants: 0x22222e, name: 'giant' },
 };
 
-/* 难度:波间隔 / 僵尸血量 / 数量 / 起始金币 / 弓箭手比例 */
+/* 难度:波间隔 / 僵尸血量 / 数量 / 起始金币 / 弓箭手比例(间隔按大地图行程校准) */
 const DIFFS = {
-  easy:   { waveInt: 26, hpMul: 0.85, cntMul: 0.8,  coinStart: 45, archerMul: 0.6 },
-  normal: { waveInt: 20, hpMul: 1.0,  cntMul: 1.0,  coinStart: 30, archerMul: 1.0 },
-  hard:   { waveInt: 16, hpMul: 1.25, cntMul: 1.35, coinStart: 25, archerMul: 1.4 },
+  easy:   { waveInt: 30, hpMul: 0.85, cntMul: 0.8,  coinStart: 45, archerMul: 0.6 },
+  normal: { waveInt: 24, hpMul: 1.0,  cntMul: 1.0,  coinStart: 30, archerMul: 1.0 },
+  hard:   { waveInt: 19, hpMul: 1.25, cntMul: 1.35, coinStart: 25, archerMul: 1.4 },
 };
 
 const TOWERS = {
@@ -211,7 +215,7 @@ function pathDist(x, z) {
     d = Math.min(d, pointSegDist(x, z, PATH[i - 1][0], PATH[i - 1][1], PATH[i][0], PATH[i][1]));
   return d;
 }
-function inGateZone(x, z) { return x > 51 && Math.abs(z - GATE_Z) < 7; }
+function inGateZone(x, z) { return x > 69 && Math.abs(z - GATE_Z) < 7; }
 
 // —— 地形(顶点色 + 棋盘格草 + 土路)——
 (function buildGround() {
@@ -257,9 +261,9 @@ function inGateZone(x, z) { return x > 51 && Math.abs(z - GATE_Z) < 7; }
   const tuftG = new THREE.BoxGeometry(0.5, 0.45, 0.5);
   const tuftM = new THREE.MeshLambertMaterial({ color: 0x6fbf4a });
   let placed = 0, guard = 0;
-  while (placed < 30 && guard++ < 900) {
+  while (placed < 46 && guard++ < 1400) {
     const x = rand(-HALF + 4, HALF - 8), z = rand(-HALF + 4, HALF - 4);
-    if (pathDist(x, z) < 4.5 || inGateZone(x, z) || x < -40) continue;
+    if (pathDist(x, z) < 4.5 || inGateZone(x, z) || x < -58) continue;
     if (PORTALS.some(p => dist2d(x, z, p[0], p[1]) < 6)) continue;
     const g = new THREE.Group();
     const t = new THREE.Mesh(trunkG, trunkM); t.position.y = 1.3; g.add(t);
@@ -269,13 +273,13 @@ function inGateZone(x, z) { return x > 51 && Math.abs(z - GATE_Z) < 7; }
     const [cx, cz] = cellOf(x, z); staticBlocked.add(cellKey(cx, cz));
     placed++;
   }
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 90; i++) {
     const x = rand(-HALF + 2, HALF - 4), z = rand(-HALF + 2, HALF - 4);
     if (pathDist(x, z) < 2.4) continue;
     const m = new THREE.Mesh(tuftG, tuftM);
     m.position.set(x, 0.2, z); m.rotation.y = rand(0, 3); scene.add(m);
   }
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 16; i++) {
     const x = rand(-HALF + 6, HALF - 10), z = rand(-HALF + 6, HALF - 6);
     if (pathDist(x, z) < 3.5 || inGateZone(x, z)) continue;
     const m = new THREE.Mesh(rockG, rockM);
@@ -284,7 +288,7 @@ function inGateZone(x, z) { return x > 51 && Math.abs(z - GATE_Z) < 7; }
 })();
 
 // —— 村子(西端)——
-const VILLAGE_SPAWN = new THREE.Vector3(-52, 0, 2);
+const VILLAGE_SPAWN = new THREE.Vector3(-72, 0, 2);
 (function buildVillage() {
   const wallM = new THREE.MeshLambertMaterial({ color: 0xcbb79a });
   const roofM = new THREE.MeshLambertMaterial({ color: 0x8a4a3a });
@@ -307,9 +311,10 @@ const VILLAGE_SPAWN = new THREE.Vector3(-52, 0, 2);
         staticBlocked.add(cellKey(cx, cz));
       }
   }
-  house(-53, -8, 5, 5, 3, 0.4);
-  house(-54, 10, 6, 5, 3.4, -0.3);
-  house(-47, -14, 4.5, 4.5, 2.8, 0.9);
+  house(-73, -9, 5, 5, 3, 0.4);
+  house(-75, 11, 6, 5, 3.4, -0.3);
+  house(-66, -16, 4.5, 4.5, 2.8, 0.9);
+  house(-67, 16, 4.5, 4.5, 2.8, -0.8);
   // 水井
   const well = new THREE.Group();
   const ring = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1, 1.6),
@@ -318,7 +323,7 @@ const VILLAGE_SPAWN = new THREE.Vector3(-52, 0, 2);
   const water = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.15, 1.1),
     new THREE.MeshBasicMaterial({ color: 0x3a7ecf }));
   water.position.y = 0.95; well.add(water);
-  well.position.set(-49, 0, 3); scene.add(well);
+  well.position.set(-69, 0, 3); scene.add(well);
 })();
 
 // —— 城市大门(东端)——
@@ -346,9 +351,9 @@ const VILLAGE_SPAWN = new THREE.Vector3(-52, 0, 2);
   const cityLight = new THREE.PointLight(0xffc766, 1.1, 30);
   cityLight.position.set(GATE_X + 4, 6, GATE_Z); scene.add(cityLight);
   // 建造禁区
-  for (let cz = 0; cz < HALF; cz++) for (let cx = 25; cx < HALF; cx++) {
+  for (let cz = 0; cz < HALF; cz++) for (let cx = 35; cx < HALF; cx++) {
     const [x, z] = cellCenter(cx, cz);
-    if (x > 51) staticBlocked.add(cellKey(cx, cz));
+    if (x > 69) staticBlocked.add(cellKey(cx, cz));
   }
 })();
 
@@ -580,7 +585,7 @@ let buildSel = 'arrow', buildTool = 'build';   // build | sell
 
 /* ---------- 玩家 ---------- */
 const player = {
-  pos: new THREE.Vector3(-50, 0, 2), vel: new THREE.Vector3(),
+  pos: new THREE.Vector3(-70, 0, 2), vel: new THREE.Vector3(),
   yaw: -Math.PI / 2, pitch: 0,
   hp: 120, maxHp: 120, lastHurt: -99,
   fireCd: 0, grenades: 1, gCd: 0, hCd: 0, sCd: 0, shieldT: 0,
@@ -788,7 +793,7 @@ function updateCoins(dt) {
     c.mesh.rotation.y = c.t * 3.2;
     c.mesh.position.y = 0.55 + Math.sin(c.t * 3) * 0.12;
     const d = dist2d(c.mesh.position.x, c.mesh.position.z, player.pos.x, player.pos.z);
-    if (!player.dead && d < 5.5) c.magnet = true;
+    if (!player.dead && d < 6.5) c.magnet = true;
     if (c.magnet && !player.dead) {
       const dx = player.pos.x - c.mesh.position.x, dz = player.pos.z - c.mesh.position.z;
       const dd = Math.hypot(dx, dz) || 1;
@@ -869,8 +874,8 @@ function updateVillagers(dt) {
     if (v.panic) v.stam = Math.min(10, (v.stam || 0) + dt);
     else v.stam = Math.max(0, (v.stam || 0) - dt * 0.6);
     let speed;
-    if (v.stam > 8) speed = 1.7;                       // 力竭
-    else speed = v.panic ? 3.25 : 2.0;
+    if (v.stam > 8) speed = 1.8;                       // 力竭
+    else speed = v.panic ? 3.45 : 2.2;
     const a = PATH[v.seg], b = PATH[v.seg + 1];
     const segLen = dist2d(a[0], a[1], b[0], b[1]);
     v.t += speed * dt / segLen;
@@ -1289,15 +1294,15 @@ function aiUpdate(dt) {
   ai.decideT -= dt;
   if (ai.decideT <= 0) { ai.decideT = 0.25; aiDecide(); }
   ai.buildT -= dt;
-  if (ai.buildT <= 0) { ai.buildT = 7; aiTryBuild(); }
+  if (ai.buildT <= 0) { ai.buildT = 5; aiTryBuild(); }
   // 平滑转向
   const dy = normAngle(ai.aimYaw - player.yaw);
   player.yaw += clamp(dy, -7 * dt, 7 * dt);
   player.pitch += clamp(ai.aimPitch - player.pitch, -5 * dt, 5 * dt);
-  player.firing = ai.target && !ai.target.dying && Math.abs(dy) < 0.18;
+  player.firing = ai.target && !ai.target.dying && Math.abs(dy) < 0.25;
 }
 function aiDecide() {
-  // ---- 威胁评估:距村民<16 或 距玩家<10 的最近僵尸 ----
+  // ---- 威胁评估:距村民<18 或 距玩家<10 的最近僵尸(弓箭手优先击杀) ----
   let threat = null, tScore = 1e9;
   for (const z of zombies) {
     if (z.dying) continue;
@@ -1308,7 +1313,10 @@ function aiDecide() {
       const d = dist2d(z.mesh.position.x, z.mesh.position.z, v.mesh.position.x, v.mesh.position.z);
       if (d < near) near = d;
     }
-    if (near < 16 && near < tScore) { tScore = near; threat = z; }
+    if (near < 18) {
+      const score = near / (z.type.bow ? 2.2 : 1);   // 弓箭手远程磨村民,权重最高
+      if (score < tScore) { tScore = score; threat = z; }
+    }
   }
   ai.target = threat;
   // ---- 瞄准:优先威胁,否则 40m 内最近僵尸 ----
@@ -1330,9 +1338,9 @@ function aiDecide() {
   // ---- 移动目标 ----
   let gx = player.pos.x, gz = player.pos.z, keep = 0;
   if (threat) {
-    // 风筝:与威胁保持 ~11m
+    // 风筝:与威胁保持 ~12m
     const d = dist2d(threat.mesh.position.x, threat.mesh.position.z, player.pos.x, player.pos.z);
-    keep = clamp((d - 11) / 6, -1, 1);   // >0 靠近, <0 后撤
+    keep = clamp((d - 12) / 6, -1, 1);   // >0 靠近, <0 后撤
     gx = threat.mesh.position.x; gz = threat.mesh.position.z;
   } else {
     // 跟随队尾(进度最低的行走村民)后方
@@ -1348,18 +1356,24 @@ function aiDecide() {
       gx = tail.mesh.position.x + dx / d * 4; gz = tail.mesh.position.z + dz / d * 4;
       keep = clamp((d - 4) / 5, 0, 1);
     }
-    // 顺路捡金币(无威胁时)
-    let coin = null, cd2 = 144;
-    for (const c of coinsArr) {
-      const d2 = (c.mesh.position.x - player.pos.x) ** 2 + (c.mesh.position.z - player.pos.z) ** 2;
-      if (d2 < cd2) { cd2 = d2; coin = c; }
-    }
-    if (coin) { gx = coin.mesh.position.x; gz = coin.mesh.position.z; keep = 1; }
   }
+  // 捡金币:无威胁专程去捡(16m),有威胁也顺路吸(7m 内)
   let mx = 0, mz = 0;
   if (keep !== 0) {
     const dx = gx - player.pos.x, dz = gz - player.pos.z, d = Math.hypot(dx, dz) || 1;
     mx = dx / d * keep; mz = dz / d * keep;
+  }
+  const coinR = threat ? 7 : 18;
+  let coin = null, cd2 = coinR * coinR;
+  for (const c of coinsArr) {
+    const d2 = (c.mesh.position.x - player.pos.x) ** 2 + (c.mesh.position.z - player.pos.z) ** 2;
+    if (d2 < cd2) { cd2 = d2; coin = c; }
+  }
+  if (coin) {
+    const cdx = coin.mesh.position.x - player.pos.x, cdz = coin.mesh.position.z - player.pos.z;
+    const cd = Math.hypot(cdx, cdz) || 1;
+    if (!threat) { mx = cdx / cd; mz = cdz / cd; }
+    else { mx += cdx / cd * 0.7; mz += cdz / cd * 0.7; }
   }
   ai.moveX = clamp(mx, -1, 1); ai.moveZ = clamp(mz, -1, 1);
   // ---- 技能 ----
@@ -1441,6 +1455,7 @@ function aiTryBuild() {
   placeTower(type, best[0], best[1]);
   spawnRing(cellCenter(best[0], best[1])[0], cellCenter(best[0], best[1])[1], 3, 0xf2cf46);
   Sfx.place();
+  banner(`🤖 ${TOWERS[type].ico} ${TOWERS[type].name}`, null, '#6fd8e8', 1);
   updateHUD();
 }
 
@@ -1930,7 +1945,7 @@ function startGame() {
   state.playT = 0; state.wave = 0; state.nextWaveT = 10;
   state.coins = DIFF().coinStart; state.kills = 0; state.saved = 0; state.dead = 0;
   pendingSpawns.length = 0;
-  player.pos.set(-50, 0, 2); player.vel.set(0, 0, 0);
+  player.pos.set(-70, 0, 2); player.vel.set(0, 0, 0);
   player.yaw = -Math.PI / 2; player.pitch = 0;
   player.hp = player.maxHp; player.dead = false; player.invuln = 1;
   player.gCd = 0; player.hCd = 0; player.fireCd = 0;
@@ -2215,7 +2230,7 @@ function updateAiTag() {
 }
 $('btn-start').addEventListener('click', () => { Sfx.unlock(); ai.enabled = false; ai.speed = 1; startGame(); updateAiTag(); });
 $('btn-demo').addEventListener('click', () => {
-  Sfx.unlock(); ai.enabled = true; ai.speed = 1; ai.buildT = 6;
+  Sfx.unlock(); ai.enabled = true; ai.speed = 1; ai.buildT = 3;
   startGame(); updateAiTag();
   banner(L('aiOn'), null, '#6fd8e8', 1.6);
 });
@@ -2299,8 +2314,8 @@ let menuAngle = 0;
 (function menuLoop() {
   if (state.mode === 'menu') {
     menuAngle += 0.0012;
-    camera.position.set(-30 + Math.cos(menuAngle) * 26, 16, Math.sin(menuAngle) * 26);
-    camera.lookAt(-20, 2, 0);
+    camera.position.set(-56 + Math.cos(menuAngle) * 26, 16, Math.sin(menuAngle) * 26);
+    camera.lookAt(-54, 2, 0);
   }
   requestAnimationFrame(menuLoop);
 })();
