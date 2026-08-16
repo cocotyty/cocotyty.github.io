@@ -13,7 +13,7 @@ const LANG = (navigator.language || 'zh').toLowerCase().startsWith('zh') ? 'zh' 
 const STR = {
   zh: {
     buildHint: 'B — 时停建造', buildTitle: '时停 · 建造模式',
-    buildTip: '滚轮缩放 · WASD/右键拖动平移 · 只能建在英雄周围 · 右键点塔拆除(50%)',
+    buildTip: '左键放塔 · 右键拆除(50%) · 滚轮缩放 · 只能建在英雄周围',
     buildExit: '返回战斗 [B]',
     tagline: '僵尸围村!你是最后的英雄——一边开枪,一边时停建塔,护送 20 名村民逃进东边城市。阵亡过半,村子就完了。',
     cMove: '移动', cLook: '视角 / 左键射击', cG: '手雷 AOE', cH: '圣光·治疗村民和塔', cS: '圣盾·周围村民免伤6秒', cB: '时停建造塔防', cJ: '跳跃',
@@ -32,6 +32,7 @@ const STR = {
     aiOn: '🤖 AI 托管开启 · P 接管', aiOff: '🎮 手动操作',
     aiTag: sp => `🤖 AI 演示中 · P 接管 · T 加速 x${sp}`,
     speedMsg: n => `⏩ 模拟速度 x${n}`,
+    tutorial: '🛠️ 金币足够!按 B 时停建塔', restart: '↻ 重新开始', toMenu: '⌂ 主菜单',
   },
   en: {
     buildHint: 'B — Time-stop & Build', buildTitle: 'TIME STOP · BUILD',
@@ -54,6 +55,7 @@ const STR = {
     aiOn: '🤖 AI takeover ON · P to grab controls', aiOff: '🎮 Manual control',
     aiTag: sp => `🤖 AI DEMO · P takeover · T speed x${sp}`,
     speedMsg: n => `⏩ Sim speed x${n}`,
+    tutorial: '🛠️ Coins ready! Press B to build', restart: '↻ RESTART', toMenu: '⌂ MAIN MENU',
   }
 };
 const L = k => typeof k === 'function' ? k() : (STR[LANG][k] || k);
@@ -132,45 +134,73 @@ const Sfx = (() => {
 })();
 
 /* ================= 常量 ================= */
-const CELL = 2, HALF = 78;            // 网格 2m,地图 156×156
+const CELL = 2, HALF = 100;           // 网格 2m,地图 200×200
 const TOTAL_VILLAGERS = 20;
 const LOSE_DEAD = Math.floor(TOTAL_VILLAGERS / 2) + 1;   // 阵亡 ≥11 即败
-const GATE_X = 75, GATE_Z = 4, GATE_HALF_W = 2.6;
+const GATE_X = 97, GATE_Z = 4, GATE_HALF_W = 2.6;
 
-// 村→城 路径点(S 形穿越全图,~183m)
+// 村→城 路径点(S 形大绕穿全图,两次过河、绕两大湖,~497m)
 const PATH = [
-  [-72, 0], [-58, -14], [-40, -6], [-26, 12], [-8, 4],
-  [8, -14], [26, -8], [44, 10], [62, 2], [74, GATE_Z]
+  [-94, 2], [-86, -28], [-62, -42], [-40, -34], [-18, -40],
+  [-2, -24], [18, -12], [42, -20], [56, 0], [36, 20],
+  [10, 14], [-13, 19], [-38, 42], [-14, 62], [16, 54],
+  [44, 64], [70, 50], [90, 30], [96, GATE_Z]
 ];
 const PATH_LEN = (() => { let s = 0; for (let i = 1; i < PATH.length; i++) s += dist2d(...PATH[i - 1], ...PATH[i]); return s; })();
 
+// 水系:两湖 + 一条南北蜿蜒河(宽5m);路径过河处架桥
+const LAKES = [[20, -30, 15], [-46, 54, 12]];
+const RIVER = [[-26, -100], [-14, 10], [-30, 100]];
+function riverDist(x, z) {
+  let d = 1e9;
+  for (let i = 1; i < RIVER.length; i++)
+    d = Math.min(d, pointSegDist(x, z, RIVER[i - 1][0], RIVER[i - 1][1], RIVER[i][0], RIVER[i][1]));
+  return d;
+}
+// 到水边缘的有符号距离:负=在水内
+function waterDist(x, z) {
+  let w = -1e9;
+  for (const [lx, lz, lr] of LAKES) w = Math.max(w, lr - dist2d(x, z, lx, lz));
+  w = Math.max(w, 2.5 - riverDist(x, z));
+  return w;
+}
+function isWaterRaw(x, z) { return waterDist(x, z) > 0; }
+function isWater(x, z) { return isWaterRaw(x, z) && pathDist(x, z) > 2.4; }  // 桥面走廊可通行
+// 陆地移动:遇水沿切向滑动(玩家/僵尸),保持守桥玩法
+function moveWater(curX, curZ, nx, nz) {
+  if (!isWater(nx, nz)) return [nx, nz];
+  if (!isWater(nx, curZ)) return [nx, curZ];
+  if (!isWater(curX, nz)) return [curX, nz];
+  return [curX, curZ];
+}
+
 // 传送门(僵尸出生点):西×3 + 北×3 + 南×3
 const PORTALS = [
-  [-75, -40], [-75, 0], [-75, 40],
-  [-48, -75], [0, -75], [48, -75],
-  [-48, 75], [0, 75], [48, 75]
+  [-97, -50], [-97, 0], [-97, 50],
+  [-60, -97], [0, -97], [60, -97],
+  [-60, 97], [0, 97], [60, 97]
 ];
 
 const ZTYPES = {
-  walker: { hp: 34, speed: 2.45, dmg: 9, coin: 2, scale: 1.0, atkR: 1.4, chew: 12, skin: 0x5d9455, shirt: 0x2e8b8b, pants: 0x35357a, name: 'walker' },
-  runner: { hp: 20, speed: 3.8, dmg: 7, coin: 2, scale: 0.85, atkR: 1.3, chew: 9, skin: 0x7ab863, shirt: 0x8a5a3a, pants: 0x4a3a5a, name: 'runner' },
-  archer: { hp: 26, speed: 2.6, dmg: 6, coin: 3, scale: 0.95, atkR: 11, chew: 8, skin: 0x6f9a58, shirt: 0x4a4456, pants: 0x33313f, bow: true, name: 'archer' },
-  brute: { hp: 105, speed: 1.3, dmg: 16, coin: 5, scale: 1.4, atkR: 1.9, chew: 24, skin: 0x4a7a44, shirt: 0x555566, pants: 0x333344, name: 'brute' },
-  giant: { hp: 400, speed: 1.1, dmg: 26, coin: 15, scale: 2.25, atkR: 2.6, chew: 42, skin: 0x3d6b3a, shirt: 0x2a2a3a, pants: 0x22222e, name: 'giant' },
+  walker: { hp: 34, speed: 3.1, dmg: 10, coin: 2, scale: 1.0, atkR: 1.4, chew: 12, skin: 0x5d9455, shirt: 0x2e8b8b, pants: 0x35357a, name: 'walker' },
+  runner: { hp: 20, speed: 4.3, dmg: 8, coin: 2, scale: 0.85, atkR: 1.3, chew: 9, skin: 0x7ab863, shirt: 0x8a5a3a, pants: 0x4a3a5a, name: 'runner' },
+  archer: { hp: 26, speed: 3.2, dmg: 7, coin: 3, scale: 0.95, atkR: 11, chew: 8, skin: 0x6f9a58, shirt: 0x4a4456, pants: 0x33313f, bow: true, name: 'archer' },
+  brute: { hp: 105, speed: 1.7, dmg: 16, coin: 5, scale: 1.4, atkR: 1.9, chew: 24, skin: 0x4a7a44, shirt: 0x555566, pants: 0x333344, name: 'brute' },
+  giant: { hp: 400, speed: 1.35, dmg: 26, coin: 15, scale: 2.25, atkR: 2.6, chew: 42, skin: 0x3d6b3a, shirt: 0x2a2a3a, pants: 0x22222e, name: 'giant' },
 };
 
-/* 难度:波间隔 / 僵尸血量 / 数量 / 起始金币 / 弓箭手比例(间隔按大地图行程校准) */
+/* 难度:波间隔 / 僵尸血量 / 数量 / 起始金币 / 弓箭手比例(497m 长征版) */
 const DIFFS = {
-  easy:   { waveInt: 30, hpMul: 0.85, cntMul: 0.8,  coinStart: 45, archerMul: 0.6 },
-  normal: { waveInt: 24, hpMul: 1.0,  cntMul: 1.0,  coinStart: 30, archerMul: 1.0 },
-  hard:   { waveInt: 19, hpMul: 1.25, cntMul: 1.35, coinStart: 25, archerMul: 1.4 },
+  easy:   { waveInt: 25, hpMul: 0.9,  cntMul: 0.9,  coinStart: 50, archerMul: 0.8 },
+  normal: { waveInt: 18, hpMul: 1.15, cntMul: 1.2,  coinStart: 35, archerMul: 1.2 },
+  hard:   { waveInt: 14, hpMul: 1.4,  cntMul: 1.55, coinStart: 25, archerMul: 1.6 },
 };
 
 const TOWERS = {
-  arrow: { name: LANG === 'zh' ? '箭塔' : 'Arrow', ico: '🏹', cost: 15, hp: 70, range: 14, rate: 0.55, dmg: 9, desc: LANG === 'zh' ? '高射速单发 · 守小路' : 'Fast single shot · guards lanes' },
-  cannon: { name: LANG === 'zh' ? '炮塔' : 'Cannon', ico: '💥', cost: 45, hp: 90, range: 13, rate: 1.7, dmg: 26, desc: LANG === 'zh' ? '范围爆炸伤害' : 'AOE splash damage' },
+  arrow: { name: LANG === 'zh' ? '箭塔' : 'Arrow', ico: '🏹', cost: 15, hp: 70, range: 14, rate: 0.5, dmg: 10, desc: LANG === 'zh' ? '高射速单发 · 守小路' : 'Fast single shot · guards lanes' },
+  cannon: { name: LANG === 'zh' ? '炮塔' : 'Cannon', ico: '💥', cost: 45, hp: 90, range: 13, rate: 1.7, dmg: 30, desc: LANG === 'zh' ? '范围爆炸伤害' : 'AOE splash damage' },
   frost: { name: LANG === 'zh' ? '冰霜塔' : 'Frost', ico: '❄️', cost: 30, hp: 60, range: 8, rate: 0, dmg: 0, desc: LANG === 'zh' ? '范围减速55%+持续冻伤' : '55% slow aura + chip dmg' },
-  wall: { name: LANG === 'zh' ? '木墙' : 'Wall', ico: '🧱', cost: 10, hp: 260, range: 0, rate: 0, dmg: 0, desc: LANG === 'zh' ? '高血量肉盾,拖住僵尸' : 'Meat shield. Zombies chew it' },
+  wall: { name: LANG === 'zh' ? '木墙' : 'Wall', ico: '🧱', cost: 10, hp: 320, range: 0, rate: 0, dmg: 0, desc: LANG === 'zh' ? '高血量肉盾,拖住僵尸' : 'Meat shield. Zombies chew it' },
 };
 
 const BUILD_R = 26;        // 建造范围:英雄周围 26m
@@ -215,7 +245,7 @@ function pathDist(x, z) {
     d = Math.min(d, pointSegDist(x, z, PATH[i - 1][0], PATH[i - 1][1], PATH[i][0], PATH[i][1]));
   return d;
 }
-function inGateZone(x, z) { return x > 69 && Math.abs(z - GATE_Z) < 7; }
+function inGateZone(x, z) { return x > 91 && Math.abs(z - GATE_Z) < 7; }
 
 // —— 地形(顶点色 + 棋盘格草 + 土路)——
 (function buildGround() {
@@ -228,8 +258,12 @@ function inGateZone(x, z) { return x > 69 && Math.abs(z - GATE_Z) < 7; }
     const pd = pathDist(x, z);
     const check = (Math.floor((x + HALF) / CELL) + Math.floor((z + HALF) / CELL)) % 2 === 0;
     const n = (Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1;
+    const wd = waterDist(x, z);
     if (pd < 1.9) c.setHex(0x8f6f4a);
     else if (pd < 2.7) c.setHex(0x7d6142);
+    else if (wd > 0) c.setHex(0x2a4a6e);                 // 水下
+    else if (wd > -2.8) c.setHex(0xd8c08a);              // 沙岸
+    else if (x > -86 && x < -74 && z > 6 && z < 20) c.setHex(check ? 0xc9a53d : 0xbd9832);  // 村口麦田
     else if (inGateZone(x, z)) c.setHex(0x9a9a92);
     else {
       const base = check ? 0x54963e : 0x4a8a37;
@@ -261,9 +295,9 @@ function inGateZone(x, z) { return x > 69 && Math.abs(z - GATE_Z) < 7; }
   const tuftG = new THREE.BoxGeometry(0.5, 0.45, 0.5);
   const tuftM = new THREE.MeshLambertMaterial({ color: 0x6fbf4a });
   let placed = 0, guard = 0;
-  while (placed < 46 && guard++ < 1400) {
+  while (placed < 64 && guard++ < 2000) {
     const x = rand(-HALF + 4, HALF - 8), z = rand(-HALF + 4, HALF - 4);
-    if (pathDist(x, z) < 4.5 || inGateZone(x, z) || x < -58) continue;
+    if (pathDist(x, z) < 4.5 || inGateZone(x, z) || x < -80 || isWaterRaw(x, z)) continue;
     if (PORTALS.some(p => dist2d(x, z, p[0], p[1]) < 6)) continue;
     const g = new THREE.Group();
     const t = new THREE.Mesh(trunkG, trunkM); t.position.y = 1.3; g.add(t);
@@ -273,22 +307,22 @@ function inGateZone(x, z) { return x > 69 && Math.abs(z - GATE_Z) < 7; }
     const [cx, cz] = cellOf(x, z); staticBlocked.add(cellKey(cx, cz));
     placed++;
   }
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < 120; i++) {
     const x = rand(-HALF + 2, HALF - 4), z = rand(-HALF + 2, HALF - 4);
-    if (pathDist(x, z) < 2.4) continue;
+    if (pathDist(x, z) < 2.4 || waterDist(x, z) > -2.5) continue;
     const m = new THREE.Mesh(tuftG, tuftM);
     m.position.set(x, 0.2, z); m.rotation.y = rand(0, 3); scene.add(m);
   }
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 20; i++) {
     const x = rand(-HALF + 6, HALF - 10), z = rand(-HALF + 6, HALF - 6);
-    if (pathDist(x, z) < 3.5 || inGateZone(x, z)) continue;
+    if (pathDist(x, z) < 3.5 || inGateZone(x, z) || isWaterRaw(x, z)) continue;
     const m = new THREE.Mesh(rockG, rockM);
     m.position.set(x, 0.35, z); m.rotation.y = rand(0, 3); scene.add(m);
   }
 })();
 
 // —— 村子(西端)——
-const VILLAGE_SPAWN = new THREE.Vector3(-72, 0, 2);
+const VILLAGE_SPAWN = new THREE.Vector3(-94, 0, 2);
 (function buildVillage() {
   const wallM = new THREE.MeshLambertMaterial({ color: 0xcbb79a });
   const roofM = new THREE.MeshLambertMaterial({ color: 0x8a4a3a });
@@ -311,10 +345,10 @@ const VILLAGE_SPAWN = new THREE.Vector3(-72, 0, 2);
         staticBlocked.add(cellKey(cx, cz));
       }
   }
-  house(-73, -9, 5, 5, 3, 0.4);
-  house(-75, 11, 6, 5, 3.4, -0.3);
-  house(-66, -16, 4.5, 4.5, 2.8, 0.9);
-  house(-67, 16, 4.5, 4.5, 2.8, -0.8);
+  house(-95, -9, 5, 5, 3, 0.4);
+  house(-97, 11, 6, 5, 3.4, -0.3);
+  house(-88, -16, 4.5, 4.5, 2.8, 0.9);
+  house(-89, 16, 4.5, 4.5, 2.8, -0.8);
   // 水井
   const well = new THREE.Group();
   const ring = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1, 1.6),
@@ -323,7 +357,7 @@ const VILLAGE_SPAWN = new THREE.Vector3(-72, 0, 2);
   const water = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.15, 1.1),
     new THREE.MeshBasicMaterial({ color: 0x3a7ecf }));
   water.position.y = 0.95; well.add(water);
-  well.position.set(-69, 0, 3); scene.add(well);
+  well.position.set(-91, 0, 3); scene.add(well);
 })();
 
 // —— 城市大门(东端)——
@@ -351,9 +385,110 @@ const VILLAGE_SPAWN = new THREE.Vector3(-72, 0, 2);
   const cityLight = new THREE.PointLight(0xffc766, 1.1, 30);
   cityLight.position.set(GATE_X + 4, 6, GATE_Z); scene.add(cityLight);
   // 建造禁区
-  for (let cz = 0; cz < HALF; cz++) for (let cx = 35; cx < HALF; cx++) {
+  for (let cz = 0; cz < HALF; cz++) for (let cx = 46; cx < HALF; cx++) {
     const [x, z] = cellCenter(cx, cz);
-    if (x > 69) staticBlocked.add(cellKey(cx, cz));
+    if (x > 91) staticBlocked.add(cellKey(cx, cz));
+  }
+})();
+
+// —— 水面 + 木桥 ——
+(function buildWater() {
+  const waterM = new THREE.MeshBasicMaterial({ color: 0x3f79b8, transparent: true, opacity: 0.88 });
+  for (const [lx, lz, lr] of LAKES) {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(lr + 1.2, 26), waterM);
+    m.rotation.x = -Math.PI / 2; m.position.set(lx, -0.12, lz); scene.add(m);
+  }
+  for (let i = 1; i < RIVER.length; i++) {
+    const [ax, az] = RIVER[i - 1], [bx, bz] = RIVER[i];
+    const len = dist2d(ax, az, bx, bz);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(len + 5, 5.6), waterM);
+    m.rotation.x = -Math.PI / 2;
+    m.rotation.z = -Math.atan2(bz - az, bx - ax);
+    m.position.set((ax + bx) / 2, -0.12, (az + bz) / 2);
+    scene.add(m);
+  }
+  // 木桥两座(路径过河点)
+  const woodM = new THREE.MeshLambertMaterial({ color: 0x8a6134 });
+  const woodD = new THREE.MeshLambertMaterial({ color: 0x6e4a28 });
+  function bridge(x, z, yaw) {
+    const g = new THREE.Group();
+    for (let i = -2; i <= 2; i++) {
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.22, 4.6), i % 2 ? woodD : woodM);
+      plank.position.set(i * 1.5, 0.16, 0); g.add(plank);
+    }
+    for (const dz of [-2.1, 2.1]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(7.4, 0.18, 0.18), woodD);
+      rail.position.set(0, 1.0, dz); g.add(rail);
+      for (const dx of [-3.2, 0, 3.2]) {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.0, 0.16), woodD);
+        post.position.set(dx, 0.6, dz); g.add(post);
+      }
+    }
+    g.position.set(x, 0, z); g.rotation.y = yaw;
+    scene.add(g);
+  }
+  bridge(-19.4, -39.6, 1.31);
+  bridge(-16.1, 21.9, -0.83);
+})();
+
+// —— 场景点缀:墓地 / 篝火营地 / 巨石阵 / 麦捆 / 芦苇 ——
+(function landmarks() {
+  const stoneM = new THREE.MeshLambertMaterial({ color: 0x9a9a94 });
+  const stoneD = new THREE.MeshLambertMaterial({ color: 0x7a7a76 });
+  // 墓地(东北,路径 (56,0)-(36,20) 之间的高地)
+  for (let i = 0; i < 9; i++) {
+    const x = 58 + (i % 3) * 3.2, z = 26 + Math.floor(i / 3) * 3.4;
+    if (pathDist(x, z) < 3.5) continue;
+    const grave = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.28), stoneM);
+    base.position.y = 0.55; grave.add(base);
+    const cross = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.24, 0.3), stoneD);
+    cross.position.y = 0.95; grave.add(cross);
+    grave.position.set(x, 0, z); grave.rotation.y = rand(-0.3, 0.3);
+    scene.add(grave);
+    const [cx, cz] = cellOf(x, z); staticBlocked.add(cellKey(cx, cz));
+  }
+  // 篝火营地(村口路北)
+  const camp = new THREE.Group();
+  for (let i = 0; i < 4; i++) {
+    const log = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.3, 0.35),
+      new THREE.MeshLambertMaterial({ color: 0x6e4a28 }));
+    log.position.y = 0.25; log.rotation.y = i * Math.PI / 4; camp.add(log);
+  }
+  const fire = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.7),
+    new THREE.MeshBasicMaterial({ color: 0xff9d45 }));
+  fire.position.y = 0.9; camp.add(fire);
+  camp.position.set(-64, 0, 14); scene.add(camp);
+  const campLight = new THREE.PointLight(0xff9d45, 0.9, 14);
+  campLight.position.set(-64, 2.2, 14); scene.add(campLight);
+  const [ccx, ccz] = cellOf(-64, 14); staticBlocked.add(cellKey(ccx, ccz));
+  // 巨石阵(南部)
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * Math.PI * 2;
+    const x = 30 + Math.cos(a) * 6, z = 82 + Math.sin(a) * 6;
+    if (pathDist(x, z) < 3.5) continue;
+    const rock = new THREE.Mesh(new THREE.BoxGeometry(1.8, rand(3, 4.4), 1.1), stoneD);
+    rock.position.set(x, 1.6, z); rock.rotation.y = a + rand(-0.3, 0.3);
+    scene.add(rock);
+    const [cx, cz] = cellOf(x, z); staticBlocked.add(cellKey(cx, cz));
+  }
+  // 村口麦捆
+  const hayM = new THREE.MeshLambertMaterial({ color: 0xd8b45a });
+  for (let i = 0; i < 6; i++) {
+    const x = -84 + (i % 3) * 4.5, z = 10 + Math.floor(i / 3) * 5;
+    const bale = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), hayM);
+    bale.position.set(x, 0.8, z); bale.rotation.y = rand(0, 1);
+    scene.add(bale);
+    const [cx, cz] = cellOf(x, z); staticBlocked.add(cellKey(cx, cz));
+  }
+  // 水边芦苇
+  const reedM = new THREE.MeshLambertMaterial({ color: 0x6a9a4a });
+  for (const [lx, lz, lr] of LAKES) {
+    for (let i = 0; i < 9; i++) {
+      const a = rand(0, Math.PI * 2), x = lx + Math.cos(a) * (lr + rand(0.5, 2)), z = lz + Math.sin(a) * (lr + rand(0.5, 2));
+      const reed = new THREE.Mesh(new THREE.BoxGeometry(0.16, rand(1.2, 2), 0.16), reedM);
+      reed.position.set(x, 0.7, z); scene.add(reed);
+    }
   }
 })();
 
@@ -563,6 +698,7 @@ const state = {
   coins: 30, kills: 0,
   saved: 0, dead: 0,
   wave: 0, nextWaveT: 8, waveActive: false,
+  builtOnce: false, tutorialT: 12,
   diff: DIFFS[localStorage.getItem('gm_diff')] ? localStorage.getItem('gm_diff') : 'normal',
   best: JSON.parse(localStorage.getItem('gm_best') || 'null'),
 };
@@ -585,7 +721,7 @@ let buildSel = 'arrow', buildTool = 'build';   // build | sell
 
 /* ---------- 玩家 ---------- */
 const player = {
-  pos: new THREE.Vector3(-70, 0, 2), vel: new THREE.Vector3(),
+  pos: new THREE.Vector3(-92, 0, 2), vel: new THREE.Vector3(),
   yaw: -Math.PI / 2, pitch: 0,
   hp: 120, maxHp: 120, lastHurt: -99,
   fireCd: 0, grenades: 1, gCd: 0, hCd: 0, sCd: 0, shieldT: 0,
@@ -874,8 +1010,8 @@ function updateVillagers(dt) {
     if (v.panic) v.stam = Math.min(10, (v.stam || 0) + dt);
     else v.stam = Math.max(0, (v.stam || 0) - dt * 0.6);
     let speed;
-    if (v.stam > 8) speed = 1.8;                       // 力竭
-    else speed = v.panic ? 3.45 : 2.2;
+    if (v.stam > 8) speed = 2.2;                       // 力竭
+    else speed = v.panic ? 4.2 : 3.0;
     const a = PATH[v.seg], b = PATH[v.seg + 1];
     const segLen = dist2d(a[0], a[1], b[0], b[1]);
     v.t += speed * dt / segLen;
@@ -1029,6 +1165,7 @@ function updateZombies(dt) {
     }
     nx = clamp(nx, -HALF + 1, HALF - 1);
     nz = clamp(nz, -HALF + 1, HALF - 1);
+    [nx, nz] = moveWater(g.position.x, g.position.z, nx, nz);   // 遇水滑动
     g.position.x = nx; g.position.z = nz;
 
     // 攻击判定(弓箭手远程放箭)
@@ -1101,6 +1238,7 @@ function placeTower(type, cx, cz) {
   mesh.add(bar);
   const tw = { type, def, mesh, hp: def.hp, maxHp: def.hp, cd: 0, key: cellKey(cx, cz), bar, tick: 0 };
   mesh.userData.tower = tw;
+  state.builtOnce = true;
   if (type === 'frost') {
     const aura = mesh.getObjectByName('aura');
     if (aura) aura.scale.setScalar(def.range / 1.17);
@@ -1526,8 +1664,12 @@ function updatePlayer(dt) {
       move.addScaledVector(fwd, touch.jy).addScaledVector(right, touch.jx);
     }
   }
-  player.pos.x += move.x * dt;
-  player.pos.z += move.z * dt;
+  {
+    const [wx, wz] = moveWater(player.pos.x, player.pos.z,
+      clamp(player.pos.x + move.x * dt, -HALF + 1, HALF - 1),
+      clamp(player.pos.z + move.z * dt, -HALF + 1, HALF - 1));
+    player.pos.x = wx; player.pos.z = wz;   // 遇水沿切向滑动
+  }
   // 重力跳跃
   player.vel.y -= 26 * dt;
   player.pos.y += player.vel.y * dt;
@@ -1656,7 +1798,7 @@ function updatePendingSpawns() {
   for (let i = pendingSpawns.length - 1; i >= 0; i--) {
     const s = pendingSpawns[i];
     if (state.playT < s.at) continue;
-    if (zombies.length > 44) { s.at = state.playT + 2; continue; }
+    if (zombies.length > 52) { s.at = state.playT + 2; continue; }
     spawnZombie(s.type, ...pickPortal());
     pendingSpawns.splice(i, 1);
   }
@@ -1721,6 +1863,14 @@ function drawMinimap() {
   c.fillStyle = '#10141f'; c.fillRect(0, 0, S, S);
   const px = player.pos.x, pz = player.pos.z;
   const X = x => R + (x - px) * sc, Y = z => R + (z - pz) * sc;
+  // 水系(湖+河)
+  c.fillStyle = '#3f79b8';
+  for (const [lx, lz, lr] of LAKES) {
+    c.beginPath(); c.arc(X(lx), Y(lz), lr * sc, 0, 7); c.fill();
+  }
+  c.strokeStyle = '#3f79b8'; c.lineWidth = 5 * sc; c.beginPath();
+  RIVER.forEach(([x, z], i) => i ? c.lineTo(X(x), Y(z)) : c.moveTo(X(x), Y(z)));
+  c.stroke();
   // 护送路线
   c.strokeStyle = '#8f6f4a'; c.lineWidth = 3; c.beginPath();
   PATH.forEach(([x, z], i) => i ? c.lineTo(X(x), Y(z)) : c.moveTo(X(x), Y(z)));
@@ -1853,13 +2003,14 @@ function renderBuildPanel() {
   });
   $('build-desc').textContent = buildTool === 'sell' ? L('sellDesc') : `${TOWERS[buildSel].name}: ${TOWERS[buildSel].desc}`;
 }
-// 建造格有效?(须在英雄 BUILD_R 范围内)
+// 建造格有效?(须在英雄 BUILD_R 范围内,不能建在水里)
 function cellBuildable(cx, cz) {
   if (cx < 1 || cz < 1 || cx >= HALF - 1 || cz >= HALF - 1) return false;
   const key = cellKey(cx, cz);
   if (staticBlocked.has(key) || towers.has(key)) return false;
   const [x, z] = cellCenter(cx, cz);
   if (dist2d(x, z, player.pos.x, player.pos.z) > BUILD_R) return false;
+  if (isWater(x, z)) return false;
   return true;
 }
 function cellInRange(cx, cz) {
@@ -1944,8 +2095,9 @@ function startGame() {
   state.trans = null;
   state.playT = 0; state.wave = 0; state.nextWaveT = 10;
   state.coins = DIFF().coinStart; state.kills = 0; state.saved = 0; state.dead = 0;
+  state.builtOnce = false; state.tutorialT = 12;
   pendingSpawns.length = 0;
-  player.pos.set(-70, 0, 2); player.vel.set(0, 0, 0);
+  player.pos.set(-92, 0, 2); player.vel.set(0, 0, 0);
   player.yaw = -Math.PI / 2; player.pitch = 0;
   player.hp = player.maxHp; player.dead = false; player.invuln = 1;
   player.gCd = 0; player.hCd = 0; player.fireCd = 0;
@@ -2036,6 +2188,13 @@ document.addEventListener('keydown', e => {
       updateAiTag();
     }
     if (e.code === 'KeyB') enterBuild();
+    if (e.code === 'Escape') {
+      // 无指针锁环境(iframe/拒绝授权)ESC 直接暂停兜底
+      state.mode = 'pause';
+      player.firing = false;
+      $('scr-pause').classList.remove('hidden');
+      $('crosshair').classList.add('hidden');
+    }
     if (e.code === 'Space') {
       if (player.canJump && !player.dead) { player.vel.y = 8.6; player.canJump = false; }
       e.preventDefault();
@@ -2241,6 +2400,25 @@ $('btn-resume').addEventListener('click', () => {
   $('crosshair').classList.remove('hidden');
   if (!isTouch) lockPointer();
 });
+$('btn-restart').addEventListener('click', () => {
+  $('scr-pause').classList.add('hidden');
+  startGame(); updateAiTag();
+});
+$('btn-tomenu').addEventListener('click', () => {
+  $('scr-pause').classList.add('hidden');
+  $('hud').classList.add('hidden');
+  $('crosshair').classList.add('hidden');
+  $('touch-ui').classList.add('hidden');
+  $('ai-tag').classList.add('hidden');
+  $('dead-overlay').classList.add('hidden');
+  resetWorld();
+  state.mode = 'menu';
+  state.trans = null;
+  gunGroup.visible = false;
+  document.exitPointerLock && document.exitPointerLock();
+  updateBestUI();
+  $('scr-menu').classList.remove('hidden');
+});
 canvas.addEventListener('click', () => {
   if (state.mode === 'play' && !isTouch && document.pointerLockElement !== canvas)
     lockPointer();
@@ -2293,6 +2471,14 @@ function loop() {
   if (state.mode === 'play') {
     const steps = ai.speed;
     for (let i = 0; i < steps; i++) stepWorld(dt);
+    // 建造新手引导:金币够却没建过塔,循环提醒
+    if (!state.builtOnce && state.coins >= TOWERS.arrow.cost) {
+      state.tutorialT -= dt;
+      if (state.tutorialT <= 0) {
+        state.tutorialT = 15;
+        banner(L('tutorial'), null, '#f2cf46', 2);
+      }
+    }
     drawMinimap();
     hudTick -= dt;
     if (hudTick <= 0) { hudTick = 0.2; updateHUD(); updateSkillUI(); }
@@ -2314,8 +2500,8 @@ let menuAngle = 0;
 (function menuLoop() {
   if (state.mode === 'menu') {
     menuAngle += 0.0012;
-    camera.position.set(-56 + Math.cos(menuAngle) * 26, 16, Math.sin(menuAngle) * 26);
-    camera.lookAt(-54, 2, 0);
+    camera.position.set(-78 + Math.cos(menuAngle) * 26, 16, Math.sin(menuAngle) * 26);
+    camera.lookAt(-76, 2, 0);
   }
   requestAnimationFrame(menuLoop);
 })();

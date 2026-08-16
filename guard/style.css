@@ -55,8 +55,9 @@ b{font-weight:normal;color:var(--gold)}
 .skill .sk-key{position:absolute;left:3px;top:2px;font-size:7px;color:var(--dim)}
 .skill .sk-cd{position:absolute;inset:0;background:rgba(6,8,14,.82);
   display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
-#build-hint{position:absolute;left:14px;bottom:14px;font-size:8px;color:var(--dim);
-  text-shadow:1px 1px 0 #000}
+#build-hint{position:absolute;left:14px;bottom:14px;font-size:9px;color:var(--gold);
+  text-shadow:1px 1px 0 #000;animation:hintBlink 1.6s steps(2) infinite}
+@keyframes hintBlink{0%,100%{opacity:1}50%{opacity:.35}}
 #hud-bc{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);
   font-size:10px;color:var(--gold);text-shadow:1px 1px 0 #000}
 
@@ -160,6 +161,7 @@ b{font-weight:normal;color:var(--gold)}
 .stars{font-size:26px;letter-spacing:8px;margin-bottom:18px;filter:drop-shadow(2px 2px 0 #000)}
 
 #scr-pause .menu-panel{padding:34px 30px}
+.pause-row{display:flex;gap:10px;justify-content:center;margin-top:12px}
 
 /* ---------- 死亡等待 ---------- */
 #dead-overlay{position:fixed;inset:0;z-index:50;background:rgba(60,4,4,.55);
