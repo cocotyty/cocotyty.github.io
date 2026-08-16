@@ -801,7 +801,7 @@ function spawnVillagers() {
     const g = makeVillager();
     const off = (i % 2 === 0 ? 1 : -1) * rand(0.5, 1.5);
     const v = {
-      mesh: g, seg: 0, t: -i * 0.45 - rand(0, 0.6),   // 负值 = 出发延迟
+      mesh: g, seg: 0, t: -rand(0, 2.2),               // 负值 = 出发延迟(2.2s 内全部上路)
       off, hp: 26, maxHp: 26, panic: false, state: 'wait', // wait|walk|dying|saved
       anim: rand(0, 6), screamCd: 0,
     };
@@ -836,7 +836,16 @@ function updateVillagers(dt) {
     if (v.state === 'wait') {
       v.t += dt;
       if (v.t >= 0) v.state = 'walk';
-      else continue;
+      else {
+        // 还没出发就被逼近 → 立刻逃命
+        for (const z of zombies) {
+          if (z.dying) continue;
+          if (dist2d(z.mesh.position.x, z.mesh.position.z, v.mesh.position.x, v.mesh.position.z) < 14) {
+            v.state = 'walk'; v.t = 0; break;
+          }
+        }
+        if (v.state === 'wait') continue;
+      }
     }
     // panic 检查
     v.panic = false;
@@ -1452,13 +1461,13 @@ function updatePendingSpawns() {
   }
 }
 function pickPortal() {
-  // 70% 概率:从"离最后一名存活村民最近的3个门"里选,实现前方/侧翼截击
+  // 70% 概率:从"离队尾(进度最低、已在行走的村民)最近的3个门"里选,从后方/侧翼追击
   let pool = PORTALS;
-  let tail = null, tailProg = -1;
+  let tail = null, tailProg = 1e9;
   for (const v of villagers) {
-    if (v.state !== 'walk' && v.state !== 'wait') continue;
+    if (v.state !== 'walk') continue;   // 只看已上路的村民,避免开局轰炸村口
     const prog = v.seg + v.t;
-    if (prog > tailProg) { tailProg = prog; tail = v; }
+    if (prog < tailProg) { tailProg = prog; tail = v; }
   }
   if (tail && Math.random() < 0.7) {
     pool = [...PORTALS].sort((a, b) =>
@@ -1732,7 +1741,7 @@ function startGame() {
   resetWorld();
   state.mode = 'play';
   state.trans = null;
-  state.playT = 0; state.wave = 0; state.nextWaveT = 6;
+  state.playT = 0; state.wave = 0; state.nextWaveT = 10;
   state.coins = DIFF().coinStart; state.kills = 0; state.saved = 0; state.dead = 0;
   pendingSpawns.length = 0;
   player.pos.set(-50, 0, 2); player.vel.set(0, 0, 0);
