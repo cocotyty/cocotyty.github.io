@@ -28,6 +28,10 @@ const STR = {
     sell: '拆除', sellDesc: '点击一座塔拆除,返还 50% 造价',
     towerSaved: '入城', buildFirst: '时停中…放好塔再回去!',
     outOfRange: '离英雄太远,不能建!', shieldOn: '🛡️ 圣盾展开!',
+    demoBtn: '🤖 自动演示 · AI 托管',
+    aiOn: '🤖 AI 托管开启 · P 接管', aiOff: '🎮 手动操作',
+    aiTag: sp => `🤖 AI 演示中 · P 接管 · T 加速 x${sp}`,
+    speedMsg: n => `⏩ 模拟速度 x${n}`,
   },
   en: {
     buildHint: 'B — Time-stop & Build', buildTitle: 'TIME STOP · BUILD',
@@ -46,6 +50,10 @@ const STR = {
     sell: 'SELL', sellDesc: 'Click a tower to sell it back for 50%',
     towerSaved: 'saved', buildFirst: 'Time stopped… place towers, then return!',
     outOfRange: 'Too far from the hero!', shieldOn: '🛡️ AEGIS UP!',
+    demoBtn: '🤖 AUTO DEMO · AI plays',
+    aiOn: '🤖 AI takeover ON · P to grab controls', aiOff: '🎮 Manual control',
+    aiTag: sp => `🤖 AI DEMO · P takeover · T speed x${sp}`,
+    speedMsg: n => `⏩ Sim speed x${n}`,
   }
 };
 const L = k => typeof k === 'function' ? k() : (STR[LANG][k] || k);
@@ -863,6 +871,9 @@ function updateVillagers(dt) {
     let speed;
     if (v.stam > 8) speed = 1.7;                       // 力竭
     else speed = v.panic ? 3.25 : 2.0;
+    const a = PATH[v.seg], b = PATH[v.seg + 1];
+    const segLen = dist2d(a[0], a[1], b[0], b[1]);
+    v.t += speed * dt / segLen;
     while (v.t >= 1 && v.seg < PATH.length - 2) { v.t -= 1; v.seg++; }
     if (v.seg >= PATH.length - 2 && v.t >= 1) {
       // 走完最后一段 → 直走进城
@@ -1263,6 +1274,176 @@ function explode(pos, dmg, radius) {
   }
 }
 
+/* ================= 自动演示 AI =================
+ * P 键随时接管/交出;T 键加速模拟(x1/x2/x4)
+ * 行为:跟队尾 → 优先扑向威胁僵尸并放风筝射击 → 捡金币
+ *       按局势放手雷/圣盾/圣光,有钱自动在路径旁建塔 */
+const ai = {
+  enabled: false, speed: 1,
+  moveX: 0, moveZ: 0, aimYaw: 0, aimPitch: 0,
+  decideT: 0, buildT: 8, target: null,
+};
+function normAngle(a) { return ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; }
+function aiUpdate(dt) {
+  if (player.dead) { player.firing = false; return; }
+  ai.decideT -= dt;
+  if (ai.decideT <= 0) { ai.decideT = 0.25; aiDecide(); }
+  ai.buildT -= dt;
+  if (ai.buildT <= 0) { ai.buildT = 7; aiTryBuild(); }
+  // 平滑转向
+  const dy = normAngle(ai.aimYaw - player.yaw);
+  player.yaw += clamp(dy, -7 * dt, 7 * dt);
+  player.pitch += clamp(ai.aimPitch - player.pitch, -5 * dt, 5 * dt);
+  player.firing = ai.target && !ai.target.dying && Math.abs(dy) < 0.18;
+}
+function aiDecide() {
+  // ---- 威胁评估:距村民<16 或 距玩家<10 的最近僵尸 ----
+  let threat = null, tScore = 1e9;
+  for (const z of zombies) {
+    if (z.dying) continue;
+    const dzp = dist2d(z.mesh.position.x, z.mesh.position.z, player.pos.x, player.pos.z);
+    let near = dzp < 10 ? dzp : 1e9;
+    for (const v of villagers) {
+      if (v.state !== 'walk' && v.state !== 'wait') continue;
+      const d = dist2d(z.mesh.position.x, z.mesh.position.z, v.mesh.position.x, v.mesh.position.z);
+      if (d < near) near = d;
+    }
+    if (near < 16 && near < tScore) { tScore = near; threat = z; }
+  }
+  ai.target = threat;
+  // ---- 瞄准:优先威胁,否则 40m 内最近僵尸 ----
+  let aimZ = threat;
+  if (!aimZ) {
+    let bd = 40;
+    for (const z of zombies) {
+      if (z.dying) continue;
+      const d = dist2d(z.mesh.position.x, z.mesh.position.z, player.pos.x, player.pos.z);
+      if (d < bd) { bd = d; aimZ = z; }
+    }
+  }
+  if (aimZ) {
+    const dx = aimZ.mesh.position.x - player.pos.x, dz = aimZ.mesh.position.z - player.pos.z;
+    const dh = Math.hypot(dx, dz) || 1;
+    ai.aimYaw = Math.atan2(-dx, -dz);
+    ai.aimPitch = Math.atan2(1.1 * aimZ.type.scale - 1.68, dh);
+  }
+  // ---- 移动目标 ----
+  let gx = player.pos.x, gz = player.pos.z, keep = 0;
+  if (threat) {
+    // 风筝:与威胁保持 ~11m
+    const d = dist2d(threat.mesh.position.x, threat.mesh.position.z, player.pos.x, player.pos.z);
+    keep = clamp((d - 11) / 6, -1, 1);   // >0 靠近, <0 后撤
+    gx = threat.mesh.position.x; gz = threat.mesh.position.z;
+  } else {
+    // 跟随队尾(进度最低的行走村民)后方
+    let tail = null, tp = 1e9;
+    for (const v of villagers) {
+      if (v.state !== 'walk') continue;
+      const p = v.seg + v.t;
+      if (p < tp) { tp = p; tail = v; }
+    }
+    if (tail) {
+      const dx = player.pos.x - tail.mesh.position.x, dz = player.pos.z - tail.mesh.position.z;
+      const d = Math.hypot(dx, dz) || 1;
+      gx = tail.mesh.position.x + dx / d * 4; gz = tail.mesh.position.z + dz / d * 4;
+      keep = clamp((d - 4) / 5, 0, 1);
+    }
+    // 顺路捡金币(无威胁时)
+    let coin = null, cd2 = 144;
+    for (const c of coinsArr) {
+      const d2 = (c.mesh.position.x - player.pos.x) ** 2 + (c.mesh.position.z - player.pos.z) ** 2;
+      if (d2 < cd2) { cd2 = d2; coin = c; }
+    }
+    if (coin) { gx = coin.mesh.position.x; gz = coin.mesh.position.z; keep = 1; }
+  }
+  let mx = 0, mz = 0;
+  if (keep !== 0) {
+    const dx = gx - player.pos.x, dz = gz - player.pos.z, d = Math.hypot(dx, dz) || 1;
+    mx = dx / d * keep; mz = dz / d * keep;
+  }
+  ai.moveX = clamp(mx, -1, 1); ai.moveZ = clamp(mz, -1, 1);
+  // ---- 技能 ----
+  if (player.gCd <= 0) {
+    // 手雷:6m 内 ≥3 只僵尸的簇,簇心距玩家 < 24
+    for (const z of zombies) {
+      if (z.dying) continue;
+      if (dist2d(z.mesh.position.x, z.mesh.position.z, player.pos.x, player.pos.z) > 24) continue;
+      let n = 0, cx = 0, cz = 0;
+      for (const o of zombies) {
+        if (o.dying) continue;
+        if (dist2d(o.mesh.position.x, o.mesh.position.z, z.mesh.position.x, z.mesh.position.z) < 6) {
+          n++; cx += o.mesh.position.x; cz += o.mesh.position.z;
+        }
+      }
+      if (n >= 3) { aiThrowGrenade(cx / n, cz / n); break; }
+    }
+  }
+  if (player.sCd <= 0) {
+    for (const v of villagers) {
+      if (v.state !== 'walk' && v.state !== 'wait') continue;
+      let danger = false;
+      for (const z of zombies) {
+        if (z.dying) continue;
+        if (dist2d(z.mesh.position.x, z.mesh.position.z, v.mesh.position.x, v.mesh.position.z) < 3.5) { danger = true; break; }
+      }
+      if (danger) { castShield(); break; }
+    }
+  }
+  if (player.hCd <= 0) {
+    const hurtV = villagers.some(v => (v.state === 'walk') && v.hp < v.maxHp * 0.6 &&
+      dist2d(v.mesh.position.x, v.mesh.position.z, player.pos.x, player.pos.z) < 12);
+    const hurtT = [...towers.values()].some(tw => tw.hp < tw.maxHp * 0.55 &&
+      dist2d(tw.mesh.position.x, tw.mesh.position.z, player.pos.x, player.pos.z) < 12);
+    if (hurtV || hurtT) castHeal();
+  }
+}
+function aiThrowGrenade(tx, tz) {
+  player.gCd = 6;
+  const from = new THREE.Vector3(player.pos.x, 1.7, player.pos.z);
+  const d = clamp(dist2d(tx, tz, from.x, from.z), 6, 24);
+  const T = d / 17;
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26),
+    new THREE.MeshBasicMaterial({ color: 0x3a4a2e }));
+  m.position.copy(from); scene.add(m);
+  projectiles.push({
+    kind: 'grenade', mesh: m, dmg: 70, life: 3,
+    vel: new THREE.Vector3((tx - from.x) / (d || 1) * 17, (0 - from.y + 0.5 * 16 * T * T) / T, (tz - from.z) / (d || 1) * 17),
+  });
+  updateSkillUI();
+}
+function aiTryBuild() {
+  if (state.coins < 15) return;
+  // 统计现有塔
+  let nf = 0, nc = 0;
+  for (const [, tw] of towers) { if (tw.type === 'frost') nf++; if (tw.type === 'cannon') nc++; }
+  let type = null;
+  if (nf < 1 && state.coins >= TOWERS.frost.cost) type = 'frost';
+  else if (nc < 1 && state.coins >= TOWERS.cannon.cost + 10) type = 'cannon';
+  else if (state.coins >= TOWERS.arrow.cost) type = 'arrow';
+  if (!type) return;
+  // 英雄周围 BUILD_R 内找"靠路径 + 僵尸多"的空格
+  const pcx = Math.floor((player.pos.x + HALF) / CELL), pcz = Math.floor((player.pos.z + HALF) / CELL);
+  let best = null, bestScore = -1;
+  for (let cx = pcx - 13; cx <= pcx + 13; cx++) for (let cz = pcz - 13; cz <= pcz + 13; cz++) {
+    if (!cellBuildable(cx, cz)) continue;
+    const [x, z] = cellCenter(cx, cz);
+    const pd = pathDist(x, z);
+    if (pd < 3 || pd > 9) continue;    // 贴路但不挡路
+    let score = (9 - pd) * 0.5;
+    for (const zb of zombies) {
+      if (zb.dying) continue;
+      if (dist2d(zb.mesh.position.x, zb.mesh.position.z, x, z) < 15) score += 2;
+    }
+    if (score > bestScore) { bestScore = score; best = [cx, cz]; }
+  }
+  if (!best) return;
+  state.coins -= TOWERS[type].cost;
+  placeTower(type, best[0], best[1]);
+  spawnRing(cellCenter(best[0], best[1])[0], cellCenter(best[0], best[1])[1], 3, 0xf2cf46);
+  Sfx.place();
+  updateHUD();
+}
+
 /* ================= 玩家 ================= */
 const keys = {};
 function hurtPlayer(dmg) {
@@ -1316,14 +1497,19 @@ function updatePlayer(dt) {
   const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
   const move = new THREE.Vector3();
-  if (keys['KeyW']) move.add(fwd);
-  if (keys['KeyS']) move.sub(fwd);
-  if (keys['KeyA']) move.sub(right);
-  if (keys['KeyD']) move.add(right);
-  if (move.lengthSq() > 0) move.normalize().multiplyScalar(keys['ShiftLeft'] ? 8.8 : 6.4);
-  // 触屏摇杆
-  if (touch.active) {
-    move.addScaledVector(fwd, touch.jy).addScaledVector(right, touch.jx);
+  if (ai.enabled) {
+    aiUpdate(dt);
+    move.set(ai.moveX, 0, ai.moveZ);
+  } else {
+    if (keys['KeyW']) move.add(fwd);
+    if (keys['KeyS']) move.sub(fwd);
+    if (keys['KeyA']) move.sub(right);
+    if (keys['KeyD']) move.add(right);
+    if (move.lengthSq() > 0) move.normalize().multiplyScalar(keys['ShiftLeft'] ? 8.8 : 6.4);
+    // 触屏摇杆
+    if (touch.active) {
+      move.addScaledVector(fwd, touch.jy).addScaledVector(right, touch.jx);
+    }
   }
   player.pos.x += move.x * dt;
   player.pos.z += move.z * dt;
@@ -1803,6 +1989,7 @@ function gameOver(win) {
     localStorage.setItem('gm_best', JSON.stringify(state.best));
   }
   setTimeout(() => $('scr-over').classList.remove('hidden'), 600);
+  updateAiTag();
   win ? Sfx.win() : Sfx.lose();
 }
 function updateBestUI() {
@@ -1822,6 +2009,17 @@ document.addEventListener('keydown', e => {
     if (e.code === 'KeyQ') castGrenade();
     if (e.code === 'KeyE') castHeal();
     if (e.code === 'KeyR') castShield();
+    if (e.code === 'KeyP') {
+      ai.enabled = !ai.enabled;
+      player.firing = false;
+      banner(L(ai.enabled ? 'aiOn' : 'aiOff'), null, '#6fd8e8', 1.2);
+      updateAiTag();
+    }
+    if (e.code === 'KeyT') {
+      ai.speed = ai.speed === 1 ? 2 : ai.speed === 2 ? 4 : 1;
+      banner(STR[LANG].speedMsg(ai.speed), null, '#6fd8e8', 0.9);
+      updateAiTag();
+    }
     if (e.code === 'KeyB') enterBuild();
     if (e.code === 'Space') {
       if (player.canJump && !player.dead) { player.vel.y = 8.6; player.canJump = false; }
@@ -2008,7 +2206,19 @@ const touch = { active: false, jx: 0, jy: 0, lookId: -1, lastX: 0, lastY: 0, pin
 })();
 
 /* ================= 按钮 ================= */
-$('btn-start').addEventListener('click', () => { Sfx.unlock(); startGame(); });
+function updateAiTag() {
+  const el = $('ai-tag');
+  if (state.mode === 'play' && ai.enabled) {
+    el.textContent = STR[LANG].aiTag(ai.speed);
+    el.classList.remove('hidden');
+  } else el.classList.add('hidden');
+}
+$('btn-start').addEventListener('click', () => { Sfx.unlock(); ai.enabled = false; ai.speed = 1; startGame(); updateAiTag(); });
+$('btn-demo').addEventListener('click', () => {
+  Sfx.unlock(); ai.enabled = true; ai.speed = 1; ai.buildT = 6;
+  startGame(); updateAiTag();
+  banner(L('aiOn'), null, '#6fd8e8', 1.6);
+});
 $('btn-again').addEventListener('click', () => { Sfx.unlock(); startGame(); });
 $('btn-resume').addEventListener('click', () => {
   $('scr-pause').classList.add('hidden');
@@ -2027,6 +2237,21 @@ $('sk-shield').addEventListener('click', castShield);
 /* ================= 主循环 ================= */
 let lastT = performance.now();
 let hudTick = 0;
+function stepWorld(dt) {
+  state.playT += dt;
+  updatePlayer(dt);
+  updateVillagers(dt);
+  updateZombies(dt);
+  updateTowers(dt);
+  updateProjectiles(dt);
+  updateCoins(dt);
+  updateParticles(dt);
+  updateRings(dt);
+  updateTracers(dt);
+  updatePendingSpawns();
+  if (muzzleLight.intensity > 0) muzzleLight.intensity = Math.max(0, muzzleLight.intensity - dt * 22);
+  if (state.playT >= state.nextWaveT) spawnWave();
+}
 function loop() {
   requestAnimationFrame(loop);
   const now = performance.now();
@@ -2051,19 +2276,8 @@ function loop() {
   }
 
   if (state.mode === 'play') {
-    state.playT += dt;
-    updatePlayer(dt);
-    updateVillagers(dt);
-    updateZombies(dt);
-    updateTowers(dt);
-    updateProjectiles(dt);
-    updateCoins(dt);
-    updateParticles(dt);
-    updateRings(dt);
-    updateTracers(dt);
-    updatePendingSpawns();
-    if (muzzleLight.intensity > 0) muzzleLight.intensity = Math.max(0, muzzleLight.intensity - dt * 22);
-    if (state.playT >= state.nextWaveT) spawnWave();
+    const steps = ai.speed;
+    for (let i = 0; i < steps; i++) stepWorld(dt);
     drawMinimap();
     hudTick -= dt;
     if (hudTick <= 0) { hudTick = 0.2; updateHUD(); updateSkillUI(); }
