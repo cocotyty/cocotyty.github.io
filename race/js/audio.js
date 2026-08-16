@@ -117,6 +117,12 @@ const Sfx = (() => {
   function ui()     { blip(660, 0.06, 'square', 0.08); }
   function warn()   { blip(990, 0.09, 'square', 0.08); setTimeout(() => blip(990, 0.09, 'square', 0.08), 130); }
 
+  /* ---- 必杀技 ---- */
+  function skillUp() { blip(392, 0.12, 'square', 0.14, 523); setTimeout(() => blip(659, 0.18, 'square', 0.13, 880), 100); }
+  function siren(hi) { blip(hi ? 945 : 708, 0.32, 'triangle', 0.05); }
+  function emp()     { blip(880, 0.5, 'sine', 0.16, 55); setTimeout(() => blip(440, 0.42, 'sine', 0.1, 48), 60); }
+  function splash()  { blip(320, 0.3, 'sawtooth', 0.1, 85); setTimeout(() => blip(210, 0.22, 'sawtooth', 0.08, 70), 70); }
+
   function record() {
     const notes = [523, 659, 784, 1046];
     notes.forEach((f, i) => setTimeout(() => blip(f, 0.16, 'triangle', 0.16), i * 110));
@@ -134,5 +140,6 @@ const Sfx = (() => {
   }
   function isMuted() { return muted; }
 
-  return { init, engine, crash, coin, pickup, shield, turbo, ui, warn, record, gameOverSfx, setMuted, isMuted };
+  return { init, engine, crash, coin, pickup, shield, turbo, ui, warn, record, gameOverSfx,
+    skillUp, siren, emp, splash, setMuted, isMuted };
 })();

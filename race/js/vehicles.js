@@ -47,20 +47,45 @@ function wheel(g, x, y, z, r, wd) {
  * 玩家车辆定义
  * maxSpeed m/s | accel m/s² | handling 横向速度 m/s | hp 耐久
  * wid/len 碰撞盒
+ * skill: 每车专属必杀技(id/emoji/cd 冷却/dur 生效时长/hpCost 施放耗血)
  * ============================================================ */
 const VEHICLE_DEFS = [
   { id: 'hatch',  emoji: '🚗', zh: '小汽车', en: 'City Hatch',   color: 0x3fa34d,
-    maxSpeed: 38, accel: 9.0,  handling: 6.6, hp: 100, wid: 1.9, len: 4.1 },
+    maxSpeed: 38, accel: 9.0,  handling: 6.6, hp: 100, wid: 1.9, len: 4.1,
+    skill: { id: 'zip', emoji: '💨', cd: 10, dur: 0,
+      name: { zh: '灵巧侧闪', en: 'ZIP SIDESTEP' },
+      desc: { zh: '向转向方向急速侧移,并获得 1 秒无敌,穿梭车缝', en: 'Instant sidestep + 1s invulnerability' },
+      toast: { zh: '💨 侧闪!', en: '💨 ZIP!' } } },
   { id: 'police', emoji: '🚓', zh: '警车',   en: 'Police',       color: 0xf2f4f6,
-    maxSpeed: 41, accel: 11.0, handling: 6.9, hp: 110, wid: 2.0, len: 4.7 },
+    maxSpeed: 41, accel: 11.0, handling: 6.9, hp: 110, wid: 2.0, len: 4.7,
+    skill: { id: 'siren', emoji: '🚨', cd: 16, dur: 5,
+      name: { zh: '警笛清道', en: 'SIREN CLEAR' },
+      desc: { zh: '鸣笛 5 秒:前方车流仓皇避让,自身速度 +10%', en: '5s siren: traffic ahead scatters, +10% speed' },
+      toast: { zh: '🚨 警笛清道,前方车辆避让!', en: '🚨 SIREN! Traffic scatters!' } } },
   { id: 'fire',   emoji: '🚒', zh: '消防车', en: 'Fire Truck',   color: 0xd23422,
-    maxSpeed: 33, accel: 6.0,  handling: 4.3, hp: 190, wid: 2.4, len: 7.4 },
+    maxSpeed: 33, accel: 6.0,  handling: 4.3, hp: 190, wid: 2.4, len: 7.4,
+    skill: { id: 'cannon', emoji: '💦', cd: 14, dur: 0.6,
+      name: { zh: '高压水炮', en: 'WATER CANNON' },
+      desc: { zh: '水炮轰开前方 50m 内的一切车辆与行人', en: 'Blast everything within 50m ahead' },
+      toast: { zh: '💦 高压水炮!', en: '💦 WATER CANNON!' } } },
   { id: 'truck',  emoji: '🚚', zh: '大卡车', en: 'Semi Truck',   color: 0x2a5aa0,
-    maxSpeed: 43, accel: 5.6,  handling: 3.9, hp: 170, wid: 2.5, len: 8.6 },
+    maxSpeed: 43, accel: 5.6,  handling: 3.9, hp: 170, wid: 2.5, len: 8.6,
+    skill: { id: 'rampage', emoji: '💥', cd: 18, dur: 3, hpCost: 15,
+      name: { zh: '大运模式', en: 'RAMPAGE' },
+      desc: { zh: '消耗 15 HP:3 秒无敌,撞击的一切车辆被撞飞翻滚', en: 'Costs 15 HP: 3s invincible, launch everything you hit' },
+      toast: { zh: '💥 大运模式!神挡撞飞!', en: '💥 RAMPAGE! LAUNCH EVERYTHING!' } } },
   { id: 'cyber',  emoji: '⚡', zh: '赛博皮卡', en: 'Cybertruck', color: 0xcfd6dd,
-    maxSpeed: 45, accel: 12.0, handling: 5.7, hp: 95,  wid: 2.2, len: 5.2 },
+    maxSpeed: 45, accel: 12.0, handling: 5.7, hp: 95,  wid: 2.2, len: 5.2,
+    skill: { id: 'emp', emoji: '🔌', cd: 20, dur: 0.6,
+      name: { zh: '电磁脉冲', en: 'EMP' },
+      desc: { zh: '瘫痪前方 110m 内的车辆 4 秒(熄火减速、灯光熄灭)', en: 'Disable vehicles ahead for 4s (engine dead)' },
+      toast: { zh: '🔌 电磁脉冲!车辆瘫痪!', en: '🔌 EMP! Vehicles disabled!' } } },
   { id: 'sport',  emoji: '🏎️', zh: 'GT跑车', en: 'GT Sports',    color: 0xe8483f,
-    maxSpeed: 46, accel: 13.0, handling: 7.6, hp: 80,  wid: 1.95, len: 4.4 }
+    maxSpeed: 46, accel: 13.0, handling: 7.6, hp: 80,  wid: 1.95, len: 4.4,
+    skill: { id: 'ghost', emoji: '👻', cd: 16, dur: 2.5,
+      name: { zh: '幽灵穿行', en: 'GHOST PHASE' },
+      desc: { zh: '2.5 秒化为幽灵,穿过一切车流行人,速度 +12%', en: '2.5s phase through all traffic, +12% speed' },
+      toast: { zh: '👻 幽灵穿行!', en: '👻 GHOST MODE!' } } }
 ];
 
 /* 通用轿车底盘(玩家向,细节多) */

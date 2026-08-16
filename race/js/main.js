@@ -15,8 +15,9 @@ const I18N = {
     tagline: '一条永无尽头的公路,一群不守规矩的司机。<br>选一辆车,避开逆行与横穿的行人,跑得越远越好。',
     bestLabel: '最长里程', start: '▶ 出发!',
     stSpeed: '极速', stAccel: '加速', stHand: '操控', stHp: '耐久',
-    helpDesktop: '⌨ ← → / A D 转向 · ↑ / W 油门 · ↓ / S 刹车<br>自动巡航,道具即时生效,撞车掉血',
-    helpTouch: '📱 ◀ ▶ 转向 · ⚡ 油门 · 🛑 刹车 · 谨防逆行车辆与横穿马路的行人',
+    helpDesktop: '⌨ ← → / A D 转向 · ↑ / W 油门 · ↓ / S 刹车 · 空格/X 必杀技<br>自动巡航,道具即时生效,撞车掉血',
+    helpTouch: '📱 ◀ ▶ 转向 · ⚡ 油门 · 🛑 刹车 · ⭐ 必杀技<br>谨防逆行车辆与横穿马路的行人',
+    skillNoHp: '💔 HP 不足,无法发动必杀',
     paused: '暂停', resume: '▶ 继续', quit: '← 返回车库',
     gameOver: 'GAME OVER', newRecord: '新纪录!', retry: '再来一局', changeCar: '换车',
     soundOn: '音效:开', soundOff: '音效:关',
@@ -31,8 +32,9 @@ const I18N = {
     tagline: 'One endless highway, a bunch of reckless drivers.<br>Pick a car, dodge wrong-way maniacs and jaywalkers, go the distance.',
     bestLabel: 'Best distance', start: '▶ DRIVE!',
     stSpeed: 'Speed', stAccel: 'Accel', stHand: 'Handling', stHp: 'Durability',
-    helpDesktop: '⌨ ← → / A D steer · ↑ / W throttle · ↓ / S brake<br>Auto-cruise, instant power-ups, collisions cost HP',
-    helpTouch: '📱 ◀ ▶ steer · ⚡ throttle · 🛑 brake<br>Beware wrong-way drivers & jaywalking pedestrians',
+    helpDesktop: '⌨ ← → / A D steer · ↑ / W throttle · ↓ / S brake · SPACE/X ultimate<br>Auto-cruise, instant power-ups, collisions cost HP',
+    helpTouch: '📱 ◀ ▶ steer · ⚡ throttle · 🛑 brake · ⭐ ultimate<br>Beware wrong-way drivers & jaywalking pedestrians',
+    skillNoHp: '💔 Not enough HP for ultimate',
     paused: 'PAUSED', resume: '▶ RESUME', quit: '← GARAGE',
     gameOver: 'GAME OVER', newRecord: 'NEW RECORD!', retry: 'RETRY', changeCar: 'GARAGE',
     soundOn: 'Sound: ON', soundOff: 'Sound: OFF',
@@ -80,8 +82,11 @@ const Game = (() => {
     hp: 100, invuln: 0, shield: 0, turbo: 0,
     runStart: 0, dist: 0, coins: 0, destroys: 0,
     railCd: 0, beatRecord: false, spot: null, shieldMesh: null,
-    wheelSpin: 0, dead: false, deadT: 0
+    wheelSpin: 0, dead: false, deadT: 0,
+    /* 必杀技 */
+    skillCd: 0, skillT: 0, dashT: 0, dashDir: 0, _ghP: 0, _siT: 0, _siHi: false
   };
+  const skOn = id => player.def && player.def.skill.id === id && player.skillT > 0;
 
   /* ---------- 输入 ---------- */
   const input = { left: false, right: false, up: false, down: false };
@@ -120,7 +125,9 @@ const Game = (() => {
       type: 'car', kind, m, tailMat, headMat, active: false,
       s: 0, l: 0, speed: 0, dir: 1, wrongWay: false,
       mode: 'normal', modeT: 0, targetL: 0, baseL: 0,
-      phase: 0, latV: 0, brake: 0, len: m.len, wid: m.wid
+      phase: 0, latV: 0, brake: 0, len: m.len, wid: m.wid,
+      fly: false, flyY: 0, vy: 0, spin: 0, flyBoost: 0, bounced: false,
+      empT: 0, yieldT: 0
     };
   }
   function makeMotoEntry() {
@@ -129,13 +136,15 @@ const Game = (() => {
     m.tails.forEach(x => x.material = tailMat);
     scene.add(m.group); m.group.visible = false;
     return { type: 'moto', m, tailMat, active: false, s: 0, l: 0, speed: 0,
-      phase: rnd(0, 9), baseL: 0, len: m.len, wid: m.wid };
+      phase: rnd(0, 9), baseL: 0, latV: 0, len: m.len, wid: m.wid,
+      fly: false, flyY: 0, vy: 0, spin: 0, flyBoost: 0, bounced: false, empT: 0 };
   }
   function makeBikeEntry() {
     const m = buildBicycle();
     scene.add(m.group); m.group.visible = false;
     return { type: 'bike', m, active: false, s: 0, l: 0, speed: 4.5,
-      wobble: rnd(0, 9), len: m.len, wid: m.wid };
+      wobble: rnd(0, 9), latV: 0, len: m.len, wid: m.wid,
+      fly: false, flyY: 0, vy: 0, spin: 0, flyBoost: 0, bounced: false };
   }
   function makePedEntry() {
     const m = buildPed();
@@ -180,6 +189,7 @@ const Game = (() => {
           e.active = true; e.wrongWay = false; e.dir = 1;
           e.s = s; e.l = l; e.baseL = l; e.targetL = l; e.latV = 0;
           e.speed = rnd(16, 23) + D * 2.2; e.brake = 0; e.modeT = rnd(2, 6);
+          e.empT = 0; e.yieldT = 0;
           e.m.group.visible = true;
         }
       }
@@ -195,7 +205,7 @@ const Game = (() => {
         if (freeSpot(s, l, e)) {
           e.active = true; e.wrongWay = false; e.dir = -1; e.mode = 'normal';
           e.s = s; e.l = l; e.baseL = l; e.targetL = l; e.latV = 0;
-          e.speed = rnd(19, 27); e.brake = 0;
+          e.speed = rnd(19, 27); e.brake = 0; e.empT = 0; e.yieldT = 0;
           e.m.group.visible = true;
         }
       }
@@ -213,7 +223,7 @@ const Game = (() => {
           if (freeSpot(s, l, e)) {
             e.active = true; e.wrongWay = true; e.dir = -1; e.mode = 'wrong';
             e.s = s; e.l = l; e.baseL = l; e.targetL = l; e.latV = 0;
-            e.speed = rnd(13, 19) + D * 1.5; e.brake = 0;
+            e.speed = rnd(13, 19) + D * 1.5; e.brake = 0; e.empT = 0; e.yieldT = 0;
             e.m.group.visible = true;
             if (warnCd <= 0) { Sfx.warn(); warnCd = 2.5; }
           }
@@ -229,7 +239,7 @@ const Game = (() => {
         const l = rnd(0.8, 5.6), s = p.s + rnd(160, 220);
         if (freeSpot(s, l, e)) {
           e.active = true; e.s = s; e.l = l; e.baseL = l;
-          e.speed = rnd(25, 31) + D * 2;
+          e.speed = rnd(25, 31) + D * 2; e.empT = 0;
           e.m.group.visible = true;
         }
       }
@@ -272,62 +282,139 @@ const Game = (() => {
     for (const e of traffic) {
       if (!e.active) continue;
 
+      /* 被撞飞/冲飞的车辆:卡通抛物线翻滚,落地报废 */
+      if (e.fly && e.type !== 'ped') {
+        e.flyBoost *= Math.pow(0.15, dt);
+        e.s += (e.speed * (e.dir || 1) + e.flyBoost) * dt;
+        e.l += e.latV * dt;
+        e.latV *= Math.pow(0.4, dt);
+        e.vy -= 17 * dt;
+        e.flyY += e.vy * dt;
+        const g = e.m.group;
+        if (e.flyY <= 0) {
+          e.flyY = 0;
+          const near = Math.abs(e.s - p.s) < 30;
+          if (e.bounced || Math.abs(e.vy) < 3.5) {
+            burst(World.cx(e.s) + e.l, 0.8, -(e.s - p.s), 0x9aa0aa, 8, 4, 0.5);
+            if (near) Sfx.crash(0.25);
+            e.active = false; e.fly = false; e.bounced = false;
+            e.m.group.visible = false;
+            e.m.group.rotation.x = 0; e.m.group.rotation.z = 0;
+            continue;
+          }
+          e.vy = Math.abs(e.vy) * 0.42;
+          e.bounced = true; e.spin *= 0.6; e.latV *= 0.5;
+          if (near) camShake = Math.min(1, camShake + 0.15);
+          burst(World.cx(e.s) + e.l, 0.4, -(e.s - p.s), 0x8a8f99, 5, 3, 0.4);
+        }
+        g.position.set(World.cx(e.s) + e.l, Math.max(0, e.flyY), -(e.s - p.s));
+        g.rotation.x += e.spin * dt;
+        g.rotation.z += e.spin * 0.55 * dt;
+        if (e.m.wheels) e.m.wheels.forEach(w => w.rotation.x -= 26 * dt);
+        if (Math.random() < 0.3) {
+          burst(g.position.x, Math.max(0, e.flyY) + 0.9, -(e.s - p.s), 0x606670, 1, 1.5, 0.5);
+        }
+        if (e.s < p.s - 32 || e.s > p.s + 430 || Math.abs(e.l) > 13.5) {
+          e.active = false; e.fly = false; e.bounced = false;
+          e.m.group.visible = false;
+          e.m.group.rotation.x = 0; e.m.group.rotation.z = 0;
+        }
+        continue;
+      }
+
       if (e.type === 'car') {
-        /* 同向车行为 */
-        if (e.dir === 1 && !e.wrongWay) {
-          e.modeT -= dt;
-          if (e.mode === 'normal' && e.modeT <= 0) {
-            e.modeT = rnd(4, 9);
-            if (Math.random() < 0.5) {          // 温和变道
-              e.targetL = World.LANES[2 + Math.floor(Math.random() * 2)];
-              e.mode = 'drift';
-            }
-          } else if (e.mode === 'changer' && e.modeT <= 0) {
-            e.modeT = rnd(1.2, 2.2);
-            /* 玩家在后方接近 → 朝玩家当前车道甩过去 */
-            const ds = e.s - p.s;
-            if (ds > 4 && ds < 34 && p.speed > e.speed - 2) e.targetL = clamp(p.l, -5.5, 5.5);
-            else e.targetL = World.LANES[Math.random() < 0.5 ? 0 : 3];
-          } else if (e.mode === 'braker' && e.modeT <= 0) {
-            e.modeT = rnd(1.5, 2.5);
-            const ds = e.s - p.s;
-            if (ds > 3 && ds < 13 && p.speed > e.speed + 2 && Math.abs(e.l - p.l) < 2.2) {
-              e.brake = 1.6;                    // 急刹挑衅
-            }
-          }
-          if (e.brake > 0) { e.brake -= dt; e.speed = Math.max(6, e.speed - 26 * dt); }
-          else e.speed = Math.min(e.speed + 3 * dt, rnd(16, 23) + difficulty() * 2);
-        }
-        /* 横向趋近 targetL */
-        if (e.mode !== 'wrong') {
-          const rate = (e.mode === 'drift') ? 1.4 : (e.mode === 'changer' ? 3.6 : 1.4);
-          const dl = e.targetL - e.l;
-          if (Math.abs(dl) > 0.05) e.l += clamp(dl, -rate * dt, rate * dt);
-        }
-        /* 防追尾同类 */
-        if (e.dir === 1) {
-          for (const o of traffic) {
-            if (!o.active || o === e || o.dir !== 1 || o.type === 'ped') continue;
-            if (o.s > e.s && o.s - e.s < 9 && Math.abs(o.l - e.l) < 1.8) {
-              e.speed = Math.min(e.speed, o.speed * 0.96);
+        if (e.empT > 0) {
+          /* 被 EMP 瘫痪:熄火滑行,灯光闪烁熄灭 */
+          e.empT -= dt;
+          e.speed = Math.max(3, e.speed - 26 * dt);
+          e.targetL = e.baseL;
+          const dle = e.targetL - e.l;
+          if (Math.abs(dle) > 0.05) e.l += clamp(dle, -0.8 * dt, 0.8 * dt);
+          e.s += e.speed * dt * e.dir;
+          const flick = Math.sin(elapsed * 26) > 0.6 ? 0.25 : 0;
+          e.tailMat.emissiveIntensity = flick;
+          e.headMat.emissiveIntensity = flick;
+        } else {
+          /* 警笛清道:前方车辆仓皇避让(逆行者也挡不住) */
+          if (skOn('siren')) {
+            const dsi = e.s - p.s;
+            if (dsi > 6 && dsi < 130 && Math.abs(e.l - p.l) < 3.8) {
+              const away = Math.sign(e.l - p.l || 1);
+              e.targetL = clamp(p.l + away * 4.0, -6.1, 6.1);
+              e.yieldT = 0.4;
             }
           }
-        }
-        e.s += e.speed * dt * e.dir;
-        /* 尾灯/大灯 */
-        e.tailMat.emissiveIntensity = (e.brake > 0 ? 2.2 : 0.35) + night * 0.6;
-        e.headMat.emissiveIntensity = 0.5 + night * 0.9;
-        if (e.wrongWay) {                       // 危险双闪
-          const flash = Math.sin(elapsed * 14) > 0 ? 2.4 : 0.2;
-          e.tailMat.emissiveIntensity = flash;
-          e.headMat.emissiveIntensity = flash;
+          /* 同向车行为 */
+          if (e.dir === 1 && !e.wrongWay) {
+            e.modeT -= dt;
+            if (e.mode === 'normal' && e.modeT <= 0) {
+              e.modeT = rnd(4, 9);
+              if (Math.random() < 0.5) {          // 温和变道
+                e.targetL = World.LANES[2 + Math.floor(Math.random() * 2)];
+                e.mode = 'drift';
+              }
+            } else if (e.mode === 'changer' && e.modeT <= 0) {
+              e.modeT = rnd(1.2, 2.2);
+              /* 玩家在后方接近 → 朝玩家当前车道甩过去 */
+              const ds = e.s - p.s;
+              if (ds > 4 && ds < 34 && p.speed > e.speed - 2) e.targetL = clamp(p.l, -5.5, 5.5);
+              else e.targetL = World.LANES[Math.random() < 0.5 ? 0 : 3];
+            } else if (e.mode === 'braker' && e.modeT <= 0) {
+              e.modeT = rnd(1.5, 2.5);
+              const ds = e.s - p.s;
+              if (ds > 3 && ds < 13 && p.speed > e.speed + 2 && Math.abs(e.l - p.l) < 2.2) {
+                e.brake = 1.6;                    // 急刹挑衅
+              }
+            }
+            if (e.brake > 0) { e.brake -= dt; e.speed = Math.max(6, e.speed - 26 * dt); }
+            else e.speed = Math.min(e.speed + 3 * dt, rnd(16, 23) + difficulty() * 2);
+          }
+          /* 横向趋近 targetL(被警笛/水炮驱赶时大幅加速) */
+          if (e.mode !== 'wrong' || e.yieldT > 0) {
+            const rate = e.yieldT > 0 ? 5.5 : (e.mode === 'drift') ? 1.4 : (e.mode === 'changer' ? 3.6 : 1.4);
+            const dl = e.targetL - e.l;
+            if (Math.abs(dl) > 0.05) e.l += clamp(dl, -rate * dt, rate * dt);
+          }
+          if (e.yieldT > 0) e.yieldT -= dt;
+          /* 防追尾同类 */
+          if (e.dir === 1) {
+            for (const o of traffic) {
+              if (!o.active || o === e || o.dir !== 1 || o.type === 'ped' || o.fly) continue;
+              if (o.s > e.s && o.s - e.s < 9 && Math.abs(o.l - e.l) < 1.8) {
+                e.speed = Math.min(e.speed, o.speed * 0.96);
+              }
+            }
+          }
+          e.s += e.speed * dt * e.dir;
+          /* 尾灯/大灯 */
+          e.tailMat.emissiveIntensity = (e.brake > 0 ? 2.2 : 0.35) + night * 0.6;
+          e.headMat.emissiveIntensity = 0.5 + night * 0.9;
+          if (e.wrongWay) {                       // 危险双闪
+            const flash = Math.sin(elapsed * 14) > 0 ? 2.4 : 0.2;
+            e.tailMat.emissiveIntensity = flash;
+            e.headMat.emissiveIntensity = flash;
+          }
         }
       }
       else if (e.type === 'moto') {
-        e.s += e.speed * dt;
-        e.l = e.baseL + Math.sin(elapsed * 1.9 + e.phase) * 1.15;
-        e.m.group.rotation.z = Math.cos(elapsed * 1.9 + e.phase) * 0.22;
-        e.tailMat.emissiveIntensity = 0.4 + night * 0.5;
+        if (e.empT > 0) {
+          e.empT -= dt;
+          e.speed = Math.max(3, e.speed - 20 * dt);
+          e.s += e.speed * dt;
+          e.tailMat.emissiveIntensity = Math.sin(elapsed * 26) > 0.6 ? 0.25 : 0;
+        } else {
+          /* 警笛:摩托也往外躲 */
+          if (skOn('siren')) {
+            const dsi = e.s - p.s;
+            if (dsi > 4 && dsi < 120 && Math.abs(e.l - p.l) < 3.4) {
+              e.baseL = clamp(e.baseL + Math.sign(e.l - p.l || 1) * 6 * dt, -6.2, 6.2);
+            }
+          }
+          e.s += e.speed * dt;
+          e.l = e.baseL + Math.sin(elapsed * 1.9 + e.phase) * 1.15;
+          e.m.group.rotation.z = Math.cos(elapsed * 1.9 + e.phase) * 0.22;
+          e.tailMat.emissiveIntensity = 0.4 + night * 0.5;
+        }
       }
       else if (e.type === 'bike') {
         e.s += e.speed * dt;
@@ -520,6 +607,52 @@ const Game = (() => {
     }
   }
 
+  /* ---------- 冲击波光环(必杀特效) ---------- */
+  const rings = [];
+  function spawnRing(color, maxR, dur) {
+    const m = new THREE.Mesh(
+      new THREE.RingGeometry(0.7, 1.0, 42),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85,
+        side: THREE.DoubleSide, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(World.cx(player.s) + player.l, 0.7, 0);
+    scene.add(m);
+    rings.push({ m, t: 0, dur, maxR });
+  }
+  function updateRings(dt) {
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const r = rings[i];
+      r.t += dt;
+      const f = r.t / r.dur;
+      if (f >= 1) {
+        scene.remove(r.m); r.m.geometry.dispose(); r.m.material.dispose();
+        rings.splice(i, 1); continue;
+      }
+      const sc = 1 + f * r.maxR;
+      r.m.scale.set(sc, sc, 1);
+      r.m.material.opacity = 0.85 * (1 - f);
+    }
+  }
+
+  /* ---------- 幽灵化:整车半透明(克隆材质,结束还原) ---------- */
+  function setGhost(on) {
+    if (!player.model) return;
+    player.model.group.traverse(o => {
+      if (!o.isMesh) return;
+      if (on) {
+        if (o.userData._om) return;
+        o.userData._om = o.material;
+        const m = o.material.clone();
+        m.transparent = true; m.opacity = 0.35; m.depthWrite = false;
+        o.material = m;
+      } else if (o.userData._om) {
+        if (o.material.dispose) o.material.dispose();
+        o.material = o.userData._om;
+        o.userData._om = null;
+      }
+    });
+  }
+
   /* ============================================================
    * 玩家
    * ============================================================ */
@@ -534,6 +667,11 @@ const Game = (() => {
     scene.add(m.group);
     player.model = m;
     player.def = def;
+    setGhost(false);
+    /* 必杀技图标同步到 HUD/触屏按钮 */
+    $('fx-skill-e').textContent = def.skill.emoji;
+    const skIco = $('pad-skill').querySelector('.sk-ico');
+    if (skIco) skIco.textContent = def.skill.emoji;
 
     /* 大灯 */
     if (player.spot) { scene.remove(player.spot); scene.remove(player.spot.target); }
@@ -569,12 +707,17 @@ const Game = (() => {
     /* 弯道离心:高速过弯被甩向弯外,需打反向修正 */
     p.l -= p.speed * p.speed * World.curveAt(p.s) * 0.55 * dt;
 
-    /* 纵向:自动巡航 / 全油门 / 刹车 / 涡轮 */
+    /* 纵向:自动巡航 / 全油门 / 刹车 / 涡轮 / 必杀加成 */
     const D = difficulty();
     const cruise = def.maxSpeed * 0.56;
     let target = input.up ? def.maxSpeed : cruise;
     let accel = def.accel * (input.up ? 1 : 0.55);
     if (p.turbo > 0) { target *= 1.34; accel *= 2.0; }
+    if (p.skillT > 0) {
+      if (def.skill.id === 'rampage') { target *= 1.16; accel *= 1.6; }
+      else if (def.skill.id === 'siren') target *= 1.1;
+      else if (def.skill.id === 'ghost') target *= 1.12;
+    }
     /* 出界:压过边线即上草地/路肩(减速,防止路肩白嫖) */
     const offroad = Math.abs(p.l) > 6.35;
     if (offroad) { target *= 0.55; accel *= 0.6; }
@@ -605,9 +748,41 @@ const Game = (() => {
     if (p.shield > 0) p.shield -= dt;
     if (p.turbo > 0) p.turbo -= dt;
 
-    /* 涡轮尾焰 */
+    /* ---- 必杀技状态 ---- */
+    if (p.skillCd > 0) p.skillCd = Math.max(0, p.skillCd - dt);
+    if (p.skillT > 0) {
+      p.skillT -= dt;
+      const sid = def.skill.id;
+      if (sid === 'rampage') {
+        /* 大运模式:烈焰尾迹(排气管高度,车尾后方,确保入镜) */
+        if (Math.random() < 0.85) {
+          burst(World.cx(p.s) + p.l + rnd(-0.6, 0.6), 1.9, -def.len / 2 + 1.2, 0xff5a1a, 2, 4, 0.5);
+        }
+        if (Math.random() < 0.45) {
+          burst(World.cx(p.s) + p.l + rnd(-0.4, 0.4), 2.3, -def.len / 2 + 1.2, 0xffd070, 2, 3, 0.4);
+        }
+      } else if (sid === 'ghost') {
+        /* 幽灵:青色残影 */
+        p._ghP -= dt;
+        if (p._ghP <= 0) {
+          p._ghP = 0.06;
+          burst(World.cx(p.s) + p.l, 1.0, 0, 0x8ae8ff, 2, 0.6, 0.4);
+        }
+        if (p.skillT <= 0) setGhost(false);
+      } else if (sid === 'siren') {
+        /* 警笛双音 */
+        p._siT -= dt;
+        if (p._siT <= 0) { p._siT = 0.44; p._siHi = !p._siHi; Sfx.siren(p._siHi); }
+      }
+    }
+    if (p.dashT > 0) {
+      p.dashT -= dt;
+      p.l += p.dashDir * 24 * dt;
+    }
+
+    /* 涡轮尾焰(车尾后方) */
     if (p.turbo > 0 && Math.random() < 0.7) {
-      burst(World.cx(p.s) + p.l + rnd(-0.4, 0.4), 0.55, def.len / 2, 0xff8c1a, 2, 3, 0.3);
+      burst(World.cx(p.s) + p.l + rnd(-0.4, 0.4), 0.55, -def.len / 2, 0xff8c1a, 2, 3, 0.3);
     }
 
     /* 里程碑提示 */
@@ -638,9 +813,9 @@ const Game = (() => {
     p.model.heads.forEach(h => h.material.emissiveIntensity = 0.7 + night * 0.6);
     p.model.tails.forEach(x => x.material.emissiveIntensity = input.down ? 2.2 : 0.3 + night * 0.5);
 
-    /* 警车灯条 */
+    /* 警车灯条(警笛清道时狂闪) */
     if (def.id === 'police' && p.model.barRed) {
-      const on = Math.sin(elapsed * 12) > 0;
+      const on = Math.sin(elapsed * (p.skillT > 0 ? 26 : 12)) > 0;
       p.model.barRed.emissiveIntensity = on ? 2.6 : 0.15;
       p.model.barBlue.emissiveIntensity = on ? 0.15 : 2.6;
     }
@@ -661,8 +836,10 @@ const Game = (() => {
   function collisions() {
     const p = player;
     if (p.dead) return;
+    const ram = skOn('rampage');
+    const gho = skOn('sport');
     for (const e of traffic) {
-      if (!e.active) continue;
+      if (!e.active || e.fly) continue;
       const hitS = Math.abs(e.s - p.s) < (e.len + p.def.len) / 2 * 0.82;
       const hitL = Math.abs(e.l - p.l) < (e.wid + p.def.wid) / 2 * 0.8;
       if (!hitS || !hitL) continue;
@@ -671,8 +848,18 @@ const Game = (() => {
       const px = World.cx(p.s) + p.l;
       const mz = -(e.s - p.s);
 
+      /* 幽灵穿行:穿过一切 */
+      if (gho) continue;
+
       if (e.type === 'ped') {
-        if (!e.fly) {
+        if (ram) {
+          /* 大运模式:行人被轰上天 */
+          e.fly = true; e.vy = 9; e.latV = Math.sign(e.l - p.l || 1) * 6; e.spin = rnd(9, 14);
+          burst(ex, 1.4, mz, 0xffffff, 8, 7, 0.55);
+          burst(ex, 1.2, mz, 0xffd070, 6, 5, 0.45);
+          Sfx.crash(0.5);
+          p.coins += 1;
+        } else if (!e.fly) {
           e.fly = true; e.vy = 5.5; e.latV = Math.sign(e.l - p.l || 1) * 4; e.spin = rnd(6, 11);
           burst(ex, 1.2, mz, 0xffffff, 5, 3, 0.35);
           Sfx.crash(0.4);
@@ -681,6 +868,25 @@ const Game = (() => {
             p.speed *= 0.78;
           }
         }
+        continue;
+      }
+
+      /* 大运模式:撞飞一切 */
+      if (ram) {
+        e.fly = true; e.bounced = false; e.flyY = 0.4;
+        e.vy = rnd(5.5, 8.5);
+        e.latV = Math.sign(e.l - p.l || 1) * rnd(4.5, 7);
+        e.spin = rnd(4.5, 8);
+        e.flyBoost = Math.max(8, p.speed * 0.55);
+        e.speed = Math.max(e.speed, 10);
+        e.m.group.rotation.y = World.yawAt(e.s) + (e.dir === 1 ? 0 : Math.PI);
+        p.destroys++; p.coins += 2;
+        Sfx.crash(0.75);
+        camShake = Math.min(1, camShake + 0.45);
+        burst(ex, 1.3, mz, 0xff5a1a, 14, 8, 0.8);
+        burst(ex, 1.3, mz, 0xffd070, 10, 6, 0.6);
+        burst(ex, 1.3, mz, 0xffffff, 6, 10, 0.45);
+        p.speed *= 0.985;
         continue;
       }
 
@@ -718,6 +924,7 @@ const Game = (() => {
 
   function damage(d, src, isRail) {
     const p = player;
+    if (skOn('rampage')) return;                 // 大运模式:无敌
     if (p.invuln > 0 && !isRail) return;
     p.hp -= d;
     if (!isRail) p.invuln = 1.35;
@@ -729,6 +936,90 @@ const Game = (() => {
     camShake = Math.min(1, camShake + 0.3);
     updateHP();
     if (p.hp <= 0) { p.hp = 0; updateHP(); gameOver(); }
+  }
+
+  /* ============================================================
+   * 必杀技:每车专属,空格 / X / 触屏 ⭐ 触发
+   * ============================================================ */
+  function castSkill() {
+    const p = player;
+    if (state !== 'play' || p.dead || !p.def.skill) return;
+    const sk = p.def.skill;
+    if (p.skillCd > 0 || p.skillT > 0) return;
+    if (sk.hpCost && p.hp <= sk.hpCost) { toast(t('skillNoHp'), true); Sfx.ui(); return; }
+
+    p.skillCd = sk.cd;
+    p.skillT = sk.dur;
+    toast(sk.toast[LANG === 'zh' ? 'zh' : 'en']);
+
+    if (sk.id === 'rampage') {
+      /* 大运模式:耗血 + 3s 无敌撞飞 */
+      p.hp -= sk.hpCost; updateHP();
+      spawnRing(0xff5030, 12, 0.55);
+      Sfx.turbo(); Sfx.crash(0.5);
+      camShake = Math.min(1, camShake + 0.4);
+    }
+    else if (sk.id === 'zip') {
+      /* 灵巧侧闪:按转向方向急闪 + 短无敌 */
+      p.invuln = 1.0;
+      p.dashT = 0.3;
+      p.dashDir = input.left ? -1 : input.right ? 1 :
+        (p.steer < -0.1 ? -1 : p.steer > 0.1 ? 1 : 0);
+      if (!p.dashDir) p.dashT = 0.12;           // 无方向:仅前冲感
+      burst(World.cx(p.s) + p.l, 0.9, 0, 0xbfffe0, 10, 5, 0.4);
+      Sfx.turbo();
+    }
+    else if (sk.id === 'siren') {
+      p._siT = 0;
+      Sfx.skillUp(); Sfx.siren(false);
+    }
+    else if (sk.id === 'cannon') {
+      /* 高压水炮:轰开前方一切 */
+      spawnRing(0x4dd7ff, 15, 0.5);
+      let hits = 0;
+      for (const e of traffic) {
+        if (!e.active) continue;
+        if (e.type !== 'ped' && e.fly) continue;
+        const ds = e.s - p.s;
+        if (ds < -4 || ds > 50) continue;
+        const dl = e.l - p.l;
+        if (Math.abs(dl) > 4.6) continue;
+        const away = Math.sign(dl || 1);
+        const ex = World.cx(e.s) + e.l, mz = -(e.s - p.s);
+        if (e.type === 'car') {
+          e.targetL = clamp(e.l + away * 4.2, -6.1, 6.1);
+          e.yieldT = 0.5; e.speed *= 0.45; e.brake = 0;
+        } else if (e.type === 'moto') {
+          e.baseL = clamp(e.baseL + away * 2.6, -6, 6); e.speed *= 0.5;
+        } else if (e.type === 'bike') {
+          e.l = clamp(e.l + away * 2.2, -6.3, 6.3);
+        } else if (e.type === 'ped' && !e.fly) {
+          e.fly = true; e.vy = 4.5; e.latV = away * 5; e.spin = rnd(5, 9);
+        }
+        burst(ex, 1.2, mz, 0x6ecbff, 7, 5, 0.5);
+        burst(ex, 1.0, mz, 0xbfe8ff, 4, 3, 0.4);
+        hits++;
+      }
+      if (hits) Sfx.splash();
+    }
+    else if (sk.id === 'emp') {
+      /* 电磁脉冲:瘫痪前方车辆 4s */
+      spawnRing(0x9fe8ff, 24, 0.9);
+      Sfx.emp();
+      for (const e of traffic) {
+        if (!e.active || e.fly) continue;
+        if (e.type !== 'car' && e.type !== 'moto') continue;
+        const ds = e.s - p.s;
+        if (ds > -25 && ds < 115) {
+          e.empT = 4;
+          burst(World.cx(e.s) + e.l, 1.2, -(e.s - p.s), 0x9fe8ff, 4, 3, 0.4);
+        }
+      }
+    }
+    else if (sk.id === 'ghost') {
+      setGhost(true);
+      Sfx.shield();
+    }
   }
 
   /* ============================================================
@@ -751,10 +1042,22 @@ const Game = (() => {
     if (p.shield > 0) $('fx-shield-t').textContent = p.shield.toFixed(1);
     if (p.turbo > 0) $('fx-turbo-t').textContent = p.turbo.toFixed(1);
 
+    /* 必杀技:激活芯片 + 按钮冷却遮罩 */
+    const sk = p.def.skill;
+    const chipSk = $('fx-skill');
+    if (p.skillCd > 0 || p.skillT > 0) {
+      chipSk.classList.remove('hidden');
+      chipSk.classList.toggle('cool', p.skillCd > 0 && p.skillT <= 0);
+      $('fx-skill-t').textContent = p.skillT > 0 ? p.skillT.toFixed(1) : Math.ceil(p.skillCd);
+    } else chipSk.classList.add('hidden');
+    const hpLocked = sk.hpCost ? p.hp <= sk.hpCost : false;
+    $('pad-skill').classList.toggle('cd', p.skillCd > 0 || p.skillT > 0 || hpLocked);
+    $('skill-cd').style.height = (clamp(p.skillCd / sk.cd, 0, 1) * 100) + '%';
+
     /* 逆行预警 */
     let worst = null;
     for (const e of traffic) {
-      if (!e.active || !e.wrongWay) continue;
+      if (!e.active || !e.wrongWay || e.fly) continue;
       const d = e.s - p.s;
       if (d > 10 && d < 230 && (worst === null || d < worst)) worst = d;
     }
@@ -817,7 +1120,7 @@ const Game = (() => {
     camera.position.set(
       camPos.x + rnd(-sh, sh), camPos.y + rnd(-sh, sh) * 0.6, camPos.z + rnd(-sh, sh) * 0.4);
     camera.lookAt(World.cx(p.s + 26) + p.l * 0.42, 1.15, -26);
-    const wantFov = 60 + ratio * 15 + (p.turbo > 0 ? 6 : 0);
+    const wantFov = 60 + ratio * 15 + (p.turbo > 0 || skOn('rampage') ? 6 : 0);
     if (Math.abs(wantFov - camFov) > 0.2) {
       camFov = lerp(camFov, wantFov, 0.08);
       camera.fov = camFov; camera.updateProjectionMatrix();
@@ -836,6 +1139,9 @@ const Game = (() => {
     p.invuln = 0; p.shield = 0; p.turbo = 0;
     p.coins = 0; p.destroys = 0; p._mile = 0; p.beatRecord = false;
     p.dead = false; p.deadT = 0;
+    p.skillCd = 0; p.skillT = 0; p.dashT = 0; p.dashDir = 0;
+    p._ghP = 0; p._siT = 0;
+    setGhost(false);
     p.model.group.visible = true; p.model.group.rotation.x = 0;
     p.runStart = p.s;
     spawnT.car = 0.6; spawnT.onc = 1.6; spawnT.wrong = 6; spawnT.moto = 3.5;
@@ -854,6 +1160,8 @@ const Game = (() => {
     const p = player;
     if (p.dead) return;
     p.dead = true;
+    setGhost(false);
+    p.skillT = 0; p.dashT = 0;
     timeScale = 0.28;
     burst(World.cx(p.s) + p.l, 1.0, 0, 0xff5030, 16, 8, 0.9);
     burst(World.cx(p.s) + p.l, 1.2, 0, 0xffd070, 10, 6, 0.7);
@@ -886,6 +1194,8 @@ const Game = (() => {
     clearTraffic(); clearItems();
     player.dead = false;
     player.speed = 0;
+    player.skillT = 0; player.skillCd = 0; player.dashT = 0;
+    setGhost(false);
     if (player.model) player.model.group.visible = true;
     $('scr-over').classList.add('hidden');
     $('scr-pause').classList.add('hidden');
@@ -922,6 +1232,8 @@ const Game = (() => {
         '<div class="veh-emoji">' + def.emoji + '</div>' +
         '<div class="veh-name">' + (LANG === 'zh' ? def.zh : def.en) + '</div>' +
         '<div class="veh-sub">' + (LANG === 'zh' ? def.en : def.zh) + '</div>' +
+        '<div class="veh-skillmini">' + def.skill.emoji + ' ' +
+          (LANG === 'zh' ? def.skill.name.zh : def.skill.name.en) + '</div>' +
         (best ? '<div class="veh-bestmini">🏆 ' + best + t('m') + '</div>' : '');
       card.addEventListener('click', () => selectVehicle(def.id));
       grid.appendChild(card);
@@ -954,6 +1266,10 @@ const Game = (() => {
     $('st-hp').style.width = (def.hp / 190 * 100) + '%';
     const best = records.map[def.id];
     $('sel-best').textContent = best ? t('vehBest', { m: best + ' m' }) : t('noVehBest');
+    const sk = def.skill;
+    $('sel-skill').innerHTML = '<b>' + sk.emoji + ' ' +
+      (LANG === 'zh' ? sk.name.zh : sk.name.en) + '</b><br>' +
+      (LANG === 'zh' ? sk.desc.zh : sk.desc.en);
     Sfx.ui();
   }
 
@@ -992,6 +1308,10 @@ const Game = (() => {
       if (keyMap[e.key] !== undefined) {
         input[keyMap[e.key]] = true;
         e.preventDefault();
+      }
+      if (e.key === ' ' || e.key === 'x' || e.key === 'X') {
+        e.preventDefault();
+        castSkill();
       }
       if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
         if (state === 'play') pauseGame();
@@ -1033,6 +1353,17 @@ const Game = (() => {
     bindPad('pad-right-btn', 'right');
     bindPad('pad-brake', 'down');
     bindPad('pad-gas', 'up');
+
+    /* 必杀技按钮(单次触发) */
+    const skBtn = $('pad-skill');
+    skBtn.addEventListener('pointerdown', ev => {
+      ev.preventDefault();
+      Sfx.init();
+      castSkill();
+      skBtn.classList.add('on');
+      setTimeout(() => skBtn.classList.remove('on'), 140);
+    });
+    skBtn.addEventListener('contextmenu', ev => ev.preventDefault());
 
     /* 全局手势:解锁音频 + 阻止页面滚动 */
     document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
@@ -1083,7 +1414,8 @@ const Game = (() => {
       updateItems(sdt);
       collisions();
       updateHUD(dt);
-      Sfx.engine(clamp(player.speed / player.def.maxSpeed, 0, 1.35), player.turbo > 0, true);
+      Sfx.engine(clamp(player.speed / player.def.maxSpeed, 0, 1.35),
+        player.turbo > 0 || skOn('rampage'), true);
     } else if (state === 'over') {
       updatePlayer(sdt);
       Sfx.engine(0, false, false);
@@ -1107,6 +1439,7 @@ const Game = (() => {
     }
 
     updateParticles(sdt);
+    updateRings(sdt);
     World.update(player.s, camera.position.x);
     updateCamera(dt, state === 'menu');
     renderer.render(scene, camera);
