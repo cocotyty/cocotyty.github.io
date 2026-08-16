@@ -133,9 +133,21 @@ footer a:hover{color:var(--gold)}
   <h2 class="sec-title" data-i18n="secTitle"></h2>
   <div class="gallery">
 
-    <a class="card" href="race/" id="card-rc">
+    <a class="card" href="guard/" id="card-gd">
       <div class="card-thumb">
         <span class="badge-new">NEW!</span>
+        <canvas width="128" height="72"></canvas>
+      </div>
+      <div class="card-body">
+        <h3 class="card-title"><span data-i18n="gdName"></span><small data-i18n="gdSub"></small></h3>
+        <p class="card-desc" data-i18n="gdDesc"></p>
+        <div class="tags" data-i18n-tags="gdTags"></div>
+        <span class="card-go" data-i18n="goGame"></span>
+      </div>
+    </a>
+
+    <a class="card" href="race/" id="card-rc">
+      <div class="card-thumb">
         <canvas width="128" height="72"></canvas>
       </div>
       <div class="card-body">
@@ -201,6 +213,9 @@ const I18N = {
     bio: 'Intel 软件工程师,目前在做 <b>LLM × Xeon 服务器 HeadNode 推理优化</b>,之前深耕<b>云原生</b>。<br>这里是我的 Vibe Game 游戏廊——和 AI 结对写的一些小游戏,<b>零依赖、浏览器直接玩</b>。',
     chipRepos: '公开仓库', chipFollowers: '关注者',
     secTitle: '☠ VIBE 游 戏 廊',
+    gdName: '守护小村姑', gdSub: 'GUARD MAIDEN',
+    gdDesc: '我的世界风 FPS×塔防护送:开枪杀僵尸、捡金币、B 键时停俯视建塔,护送 20 名村民进城门。弓箭手放冷箭,僵尸会把你的塔啃掉!',
+    gdTags: ['FPS 射击','时停建造','护送村民','Three.js','3 难度'],
     rcName: '狂飙公路', rcSub: 'TURBO HIGHWAY',
     rcDesc: '3D 无尽公路狂飙:6 种座驾任选,道具乱捡、逆行者迎面冲、行人随时横穿。黄昏入夜,跑出你的最长纪录。',
     rcTags: ['3D 赛车','Three.js','6 种车辆','昼夜循环','逆行车流'],
@@ -222,6 +237,9 @@ const I18N = {
     bio: 'Software engineer at Intel, currently optimizing <b>LLM inference on Xeon-server head nodes</b>; previously deep in <b>cloud native</b>.<br>This is my vibe game arcade — small games pair-built with AI, <b>zero deps, playable right in the browser</b>.',
     chipRepos: 'repos', chipFollowers: 'followers',
     secTitle: '☠ VIBE GAME ARCADE',
+    gdName: 'Guard Maiden', gdSub: '守护小村姑',
+    gdDesc: 'Minecraft-style FPS × tower-defense escort: shoot zombies, grab coins, press B to stop time and build towers top-down, escort 20 villagers to the city gate. Archers snipe from afar — and zombies chew your towers down!',
+    gdTags: ['FPS','Time-stop Build','Escort','Three.js','3 Difficulties'],
     rcName: 'Turbo Highway', rcSub: '狂飙公路',
     rcDesc: '3D endless highway madness: 6 vehicles, instant power-ups, wrong-way maniacs & jaywalkers. From dusk to night — set your distance record.',
     rcTags: ['3D Racing','Three.js','6 Vehicles','Day-Night','Wrong-Way AI'],
@@ -294,7 +312,111 @@ function bgFill(c, w, h, top, bottom){
   c.fillStyle = g; c.fillRect(0,0,w,h);
 }
 
-/* ============ 卡0:狂飙公路 ============ */
+/* ============ 卡0:守护小村姑 ============ */
+(function(){
+  const cv = document.querySelector('#card-gd canvas');
+  const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+  const W = 128, H = 72, GY = 50;
+  const pal = {k:'#0b0b12',G:'#5d9455',g:'#7ab863',T:'#2e8b8b',P:'#35357a',
+    r:'#7a5a3a',h:'#c8a17a',w:'#a9825a',d:'#6e5530',S:'#8f9298',D:'#6a6d73',
+    Y:'#f2cf46',E:'#1a0a0a',H:'#2a2733',B:'#6e4a2a',C:'#dff7ff'};
+  /* 村民(棕袍+大脑袋) */
+  const villager = mk([
+    '....kkkk....','...khhhhk...','..khhhhhhk..','..khEhhEhk..',
+    '..khhhhhhk..','...kkkkkk...','..krrrrrrk..','.krrrrrrrrk.',
+    '.krrrrrrrrk.','.krrrrrrrrk.','.krrrrrrrrk.','..kkkkkkkk..'], pal);
+  /* 普通僵尸(绿皮青衫) */
+  const zombie = mk([
+    '....kkkk....','...kGGGGk...','..kGGGGGGk..','..kGeGGeGk..',
+    '..kGGGGGGk..','...kkkkkk...','..kTTTTTTk..','.kGGTTTTGGk.',
+    '.kGGTTTTGGk.','..kPPPPPPk..','..kPP..PPk..','..kPP..PPk..',
+    '..kkk..kkk..'], pal);
+  /* 弓箭手僵尸(兜帽+持弓) */
+  const archer = mk([
+    '..kHHHHHHk..','..kHHHHHHk..','...kGGGGk...','..kGGGGGGk..',
+    '..kGeGGeGk..','..kGGGGGGk..','...kkkkkk...','..kHHHHHHk..',
+    '.kGGHHHHGGkB','.kGGHHHHGGk.','..kPPPPPPk..','..kPP..PPk..',
+    '..kkk..kkk..'], pal);
+  /* 箭塔 */
+  const tower = mk([
+    '..kddddddk..','.kSSSSSSSSk.','.kSSSSSSSSk.','.kDSSSSSSDk.',
+    '....kwwk....','..kkwwwwkk..','..kw.YY.wk..','..kw.YY.wk..',
+    '..kkwwwwkk..','..kddddddk..'], pal);
+  const house = mk([
+    '...kkkkkkk...','..kDDDDDDDk..','.kDDDDDDDDDk.','kDDDDDDDDDDDk',
+    '.kwwwwwwwwwk.','.kwwYwwwwYwk','.kwwwwwwwwwk.','.kwwwwdwwwwk.',
+    '.kwwwwdwwwwk.','.kwwwwwwwwwk.','.kkkkkkkkkkk.'], pal);
+  let zx1 = -14, zx2 = -30, vx = 14, tracer = -10, arrow = -10, coins = [];
+  function draw(t){
+    /* 夜空 */
+    const g = c.createLinearGradient(0,0,0,GY);
+    g.addColorStop(0,'#10162a'); g.addColorStop(1,'#1d2942');
+    c.fillStyle = g; c.fillRect(0,0,W,GY);
+    /* 星月 */
+    c.fillStyle = '#cfd8ff';
+    for(let i=0;i<16;i++){
+      if((t/420+i)%6<4) c.fillRect((i*31+5)%W, (i*13+4)%28, 1, 1);
+    }
+    c.fillStyle = '#f4f0dc'; c.fillRect(104, 8, 9, 9);
+    c.fillStyle = '#d8d4c0'; c.fillRect(107, 10, 3, 2);
+    /* 地面 + 土路 */
+    c.fillStyle = '#3d6b31'; c.fillRect(0, GY, W, H-GY);
+    c.fillStyle = '#47793a';
+    for(let x=0;x<W;x+=8) c.fillRect(x+(x%16?2:5), GY+3+(x%12), 4, 2);
+    c.fillStyle = '#8f6f4a'; c.fillRect(0, 56, W, 7);
+    c.fillStyle = '#7d6142';
+    for(let x=0;x<W;x+=6) c.fillRect(x, 57+(x%3), 3, 1);
+    /* 村子(左)与城门(右) */
+    c.drawImage(house, 2, 36);
+    c.fillStyle = '#6a6d73'; c.fillRect(118, 26, 6, 44);
+    c.fillStyle = '#8f9298'; c.fillRect(117, 24, 3, 46); c.fillRect(123, 24, 3, 46);
+    c.fillStyle = '#f2cf46'; c.fillRect(119, 22, 4, 3);
+    /* 箭塔 */
+    c.drawImage(tower, 56, 40);
+    /* 村民向右跑 */
+    vx += 0.22; if(vx > 96) vx = 8;
+    const vb = -Math.abs(Math.sin(t/110))*1;
+    c.drawImage(villager, Math.round(vx), Math.round(60-vb));
+    c.drawImage(villager, Math.round(vx-14), Math.round(61-vb));
+    /* 僵尸追 + 弓箭手 */
+    zx1 += 0.12; if(zx1 > 60) zx1 = -14;
+    zx2 += 0.10; if(zx2 > 48) zx2 = -30;
+    const zb = -Math.abs(Math.sin(t/150))*1;
+    c.drawImage(zombie, Math.round(zx1), Math.round(59-zb));
+    c.drawImage(archer, Math.round(zx2), Math.round(58+zb));
+    /* 金币 */
+    if(coins.length < 4 && Math.random() < 0.05) coins.push({x: 20+Math.random()*60, y: 62, s: Math.random()*6});
+    c.fillStyle = '#f2cf46';
+    for(const co of coins){
+      co.s += 0.08;
+      if(co.s > 3) { co.done = true; continue; }
+      c.fillRect(Math.round(co.x), Math.round(co.y - co.s*2), 2, 2);
+    }
+    coins = coins.filter(co => !co.done);
+    /* 箭塔射箭 */
+    if(arrow < 0 && t % 1400 < 40) arrow = 62;
+    if(arrow >= 0){ arrow += 2.4; if(arrow > 118) arrow = -10; }
+    if(arrow >= 0){ c.fillStyle = '#e8e2cf'; c.fillRect(Math.round(arrow), 45, 4, 1); }
+    /* 第一人称枪 + 曳光 */
+    c.fillStyle = '#141824';
+    c.fillRect(6, H-13, 26, 6); c.fillRect(28, H-11, 8, 4);
+    c.fillStyle = '#8a6134'; c.fillRect(4, H-11, 5, 7);
+    c.fillStyle = '#bfe6ff'; c.fillRect(9, H-12, 5, 2);
+    if(tracer < 0 && t % 900 < 30) tracer = 36;
+    if(tracer >= 0){ tracer += 3.4; if(tracer > 126) tracer = -10; }
+    if(tracer >= 0){
+      c.fillStyle = '#ffe66e'; c.fillRect(Math.round(tracer), H-11, 6, 1);
+      c.fillStyle = '#fff'; c.fillRect(Math.round(tracer)+6, H-11, 2, 1);
+    }
+    /* 时停网格暗示(顶部一条) */
+    c.globalAlpha = 0.25; c.strokeStyle = '#6fd8e8';
+    for(let x=0;x<W;x+=16){ c.beginPath(); c.moveTo(x, GY-18); c.lineTo(x+8, GY-18); c.stroke(); }
+    c.globalAlpha = 1;
+  }
+  window.__gdDraw = draw;
+})();
+
+/* ============ 卡1:狂飙公路 ============ */
 (function(){
   const cv = document.querySelector('#card-rc canvas');
   const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
@@ -540,6 +662,7 @@ function bgFill(c, w, h, top, bottom){
 /* ============ 统一动画循环 ============ */
 (function loop(){
   const t = performance.now();
+  window.__gdDraw && window.__gdDraw(t);
   window.__rcDraw && window.__rcDraw(t);
   window.__tdDraw && window.__tdDraw(t);
   window.__vgDraw && window.__vgDraw(t);

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d14">
+<meta name="description" content="守护小村姑 GUARD MAIDEN — 体素风 FPS × 塔防护送:僵尸围村,护送村民进城,时停建塔">
+<title>守护小村姑 · GUARD MAIDEN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="cv"></canvas>
+
+<!-- ===== 准星 ===== -->
+<div id="crosshair" class="hidden"><span></span><span></span><span></span><span></span><i></i></div>
+
+<!-- ===== HUD ===== -->
+<div id="hud" class="hidden">
+  <div id="hud-tl">
+    <div class="hp-wrap"><div class="hp-label">HP</div><div class="hp-bar"><div id="hp-fill"></div></div><div id="hp-num">120</div></div>
+    <div id="coin-line">🪙 <b id="coin-num">30</b></div>
+    <canvas id="minimap" width="150" height="150"></canvas>
+  </div>
+  <div id="hud-tr">
+    <div class="vill-line">🧑‍🌾 <b id="v-alive">20</b><span class="dim">存活</span> · 🏰 <b id="v-saved">0</b><span class="dim">入城</span> · 💀 <b id="v-dead">0</b><span class="dim">阵亡</b></div>
+    <div class="vill-line small"><span class="dim">威胁</span> 🧟 <b id="z-num">0</b> <span class="dim">· 尸潮</span> <b id="w-num">1</b></div>
+  </div>
+  <div id="hud-br">
+    <div class="skill" id="sk-grenade"><div class="sk-ico">💣</div><div class="sk-key">Q</div><div class="sk-cd" id="cd-grenade"></div></div>
+    <div class="skill" id="sk-heal"><div class="sk-ico">✨</div><div class="sk-key">E</div><div class="sk-cd" id="cd-heal"></div></div>
+    <div class="skill" id="sk-shield"><div class="sk-ico">🛡️</div><div class="sk-key">R</div><div class="sk-cd" id="cd-shield"></div></div>
+    <div class="skill" id="sk-build"><div class="sk-ico">🛠️</div><div class="sk-key">B</div><div class="sk-cd"></div></div>
+  </div>
+  <div id="build-hint">🛠️ <span data-i18n="buildHint">B — 时停建造</span></div>
+  <div id="hud-bc"></div>
+</div>
+
+<!-- ===== 波次横幅 / 公告 ===== -->
+<div id="banner" class="hidden"></div>
+<div id="sub-banner" class="hidden"></div>
+
+<!-- ===== 受击红闪 ===== -->
+<div id="dmg-flash"></div>
+
+<!-- ===== 建造模式 UI ===== -->
+<div id="build-ui" class="hidden">
+  <div id="build-top">
+    <div class="build-title">⏸ <span data-i18n="buildTitle">时停 · 建造模式</span></div>
+    <div class="build-tip" data-i18n="buildTip">滚轮缩放 · WASD/拖动平移 · 右键拆除(返还50%)</div>
+    <button id="btn-build-exit" data-i18n="buildExit">返回战斗 [B]</button>
+  </div>
+  <div id="build-panel"></div>
+  <div id="build-desc"></div>
+</div>
+
+<!-- ===== 触屏控件 ===== -->
+<div id="touch-ui" class="hidden">
+  <div id="joy"><div id="joy-knob"></div></div>
+  <div id="look-pad"></div>
+  <div id="t-buttons">
+    <div class="tbtn sm" id="tb-g">💣</div>
+    <div class="tbtn sm" id="tb-h">✨</div>
+    <div class="tbtn sm" id="tb-s">🛡️</div>
+    <div class="tbtn sm" id="tb-b">🛠️</div>
+    <div class="tbtn" id="tb-fire">🔥</div>
+  </div>
+</div>
+
+<!-- ===== 3D 引擎加载失败 ===== -->
+<div id="engine-error" class="hidden"><div class="err-inner">3D 引擎加载失败,请检查网络后刷新<br>Failed to load 3D engine</div></div>
+
+<!-- ===== 主菜单 ===== -->
+<div class="screen" id="scr-menu">
+  <div class="menu-panel">
+    <div class="menu-village">🏠🏰🧟🧟🧟</div>
+    <h1 class="game-title">守护小村姑</h1>
+    <div class="game-sub">GUARD&nbsp;MAIDEN&nbsp;·&nbsp;FPS&nbsp;×&nbsp;TOWER&nbsp;DEFENSE</div>
+    <p class="tagline" data-i18n="tagline">僵尸围村!你是最后的英雄——一边开枪,一边时停建塔,护送 20 名村民逃进城里。阵亡过半,村子就完了。</p>
+    <div class="ctrl-grid">
+      <div><b>WASD</b><span data-i18n="cMove">移动</span></div>
+      <div><b>鼠标</b><span data-i18n="cLook">视角 / 左键射击</span></div>
+      <div><b>Q</b><span data-i18n="cG">手雷(AOE)</span></div>
+      <div><b>E</b><span data-i18n="cH">圣光(治疗村民+塔)</span></div>
+      <div><b>R</b><span data-i18n="cS">圣盾(村民免伤6秒)</span></div>
+      <div><b>B</b><span data-i18n="cB">时停建造塔防</span></div>
+      <div><b>空格</b><span data-i18n="cJ">跳跃</span></div>
+    </div>
+    <div class="diff-row" id="diff-row">
+      <button class="diff-btn" data-d="easy" data-i18n="dE">😊 简单</button>
+      <button class="diff-btn sel" data-d="normal" data-i18n="dN">⚔️ 普通</button>
+      <button class="diff-btn" data-d="hard" data-d="dH">💀 困难</button>
+    </div>
+    <div class="best-line">🏆 <span data-i18n="bestLabel">最佳护送</span> <b id="menu-best">--</b></div>
+    <button class="btn-start" id="btn-start" data-i18n="start">▶ 出发护送</button>
+    <div class="menu-foot" data-i18n="foot">僵尸会啃塔 · 金币来自僵尸掉落 · 活着进城就是分数</div>
+  </div>
+</div>
+
+<!-- ===== 结算 ===== -->
+<div class="screen hidden" id="scr-over">
+  <div class="menu-panel">
+    <h1 class="over-title" id="over-title">胜利</h1>
+    <div class="game-sub" id="over-sub"></div>
+    <div class="score-big" id="over-score">0</div>
+    <div class="over-detail" id="over-detail"></div>
+    <div class="stars" id="over-stars"></div>
+    <button class="btn-start" id="btn-again" data-i18n="again">↻ 再来一局</button>
+  </div>
+</div>
+
+<!-- ===== 暂停 ===== -->
+<div class="screen hidden" id="scr-pause">
+  <div class="menu-panel">
+    <h1 class="over-title">⏸ <span data-i18n="paused">暂停</span></h1>
+    <button class="btn-start" id="btn-resume" data-i18n="resume">继续游戏</button>
+  </div>
+</div>
+
+<!-- ===== 死亡等待 ===== -->
+<div id="dead-overlay" class="hidden">
+  <div class="dead-inner">☠<div data-i18n="deadTxt">你倒下了…</div><div id="dead-count">6</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"
+  onerror="document.getElementById('engine-error').classList.remove('hidden')"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
