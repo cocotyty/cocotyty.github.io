@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a10">
+<meta name="description" content="征服纪元 — 类英雄无敌3的回合制策略:五大种族、42种兵种、超大战术地图、魔法与英雄养成,纯浏览器畅玩数小时">
+<title>征服纪元 · Age of Conquest</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ 主菜单 ============ -->
+<div id="screen-menu">
+  <div class="menu-box">
+    <div class="menu-title">⚔️ 征服纪元</div>
+    <div class="menu-sub">AGE OF CONQUEST · 类英雄无敌回合制大策略</div>
+    <div class="menu-opts">
+      <label>🗺️ 地图
+        <select id="opt-size"></select>
+      </label>
+      <label>👑 玩家
+        <select id="opt-players">
+          <option value="2">2 家</option><option value="3">3 家</option><option value="4" selected>4 家</option>
+          <option value="5">5 家</option><option value="6">6 家</option><option value="7">7 家</option><option value="8">8 家</option>
+        </select>
+      </label>
+      <label>💀 难度
+        <select id="opt-diff">
+          <option value="easy">简单</option>
+          <option value="normal" selected>普通</option>
+          <option value="hard">困难</option>
+          <option value="insane">极难</option>
+        </select>
+      </label>
+    </div>
+    <div class="fac-label">选择你的种族</div>
+    <div id="faction-row"></div>
+    <div class="menu-btns">
+      <button class="btn gold big" id="btn-start">⚔️ 开始征服</button>
+      <button class="btn big" id="btn-continue">📂 继续上次</button>
+      <button class="btn big" id="btn-back">🏠 返回主页</button>
+    </div>
+    <div class="menu-hint">占领所有敌方城镇与英雄即可获胜 · 进度自动保存于浏览器</div>
+  </div>
+</div>
+
+<!-- ============ 游戏 ============ -->
+<div id="game" class="hidden">
+  <div id="topbar">
+    <div id="res-bar"></div>
+    <div id="date-bar"></div>
+    <div id="turn-bar"></div>
+    <div class="top-btns">
+      <button class="btn" id="btn-menu">☰</button>
+      <button class="btn" id="btn-next-hero">🤺 英雄</button>
+      <button class="btn gold" id="btn-end-turn">⏭ 结束回合</button>
+    </div>
+  </div>
+  <div id="main-row">
+    <div id="map-wrap">
+      <canvas id="map"></canvas>
+      <canvas id="minimap"></canvas>
+      <div id="tile-tip"></div>
+      <div id="turn-banner"></div>
+    </div>
+    <div id="sidebar"></div>
+  </div>
+</div>
+
+<!-- ============ 战斗 ============ -->
+<div id="battle" class="hidden">
+  <div id="battle-top">
+    <div id="b0-info"></div>
+    <div id="battle-turn"></div>
+    <div id="b1-info"></div>
+  </div>
+  <canvas id="battle-canvas"></canvas>
+  <div id="battle-bar">
+    <button class="btn" id="battle-spells">📖 法术</button>
+    <button class="btn" id="battle-wait">⏳ 等待</button>
+    <button class="btn" id="battle-defend">🛡 防御</button>
+    <button class="btn" id="battle-speed">▶ 正常</button>
+    <button class="btn gold" id="battle-auto">⚡ 自动战斗</button>
+    <div id="battle-log"></div>
+  </div>
+</div>
+
+<div id="modal-root" class="hidden"></div>
+<div id="toasts"></div>
+
+<script>
+/* 测试辅助:收集运行时错误 */
+window.__errs = [];
+window.addEventListener('error', function (e) {
+  window.__errs.push((e.message || 'error') + ' @' + (e.filename || '').split('/').pop() + ':' + e.lineno);
+});
+</script>
+<script src="js/util.js"></script>
+<script src="js/data.js"></script>
+<script src="js/path.js"></script>
+<script src="js/mapgen.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

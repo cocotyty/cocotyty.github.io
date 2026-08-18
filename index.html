@@ -133,9 +133,21 @@ footer a:hover{color:var(--gold)}
   <h2 class="sec-title" data-i18n="secTitle"></h2>
   <div class="gallery">
 
-    <a class="card" href="sg/" id="card-sg">
+    <a class="card" href="heroes/" id="card-aq">
       <div class="card-thumb">
         <span class="badge-new">NEW!</span>
+        <canvas width="128" height="72"></canvas>
+      </div>
+      <div class="card-body">
+        <h3 class="card-title"><span data-i18n="aqName"></span><small data-i18n="aqSub"></small></h3>
+        <p class="card-desc" data-i18n="aqDesc"></p>
+        <div class="tags" data-i18n-tags="aqTags"></div>
+        <span class="card-go" data-i18n="goGame"></span>
+      </div>
+    </a>
+
+    <a class="card" href="sg/" id="card-sg">
+      <div class="card-thumb">
         <canvas width="128" height="72"></canvas>
       </div>
       <div class="card-body">
@@ -228,6 +240,9 @@ const I18N = {
     sgName: '三国烽火', sgSub: 'THREE KINGDOMS 196',
     sgDesc: '群雄割据大战略:39 城 11 势力 130 员战将,内政征伐、火攻伏兵、武将单挑。AI 群雄逐鹿各有性格,多存档+自动保存,扫平乱世一统天下!',
     sgTags: ['回合战略','39 城大地图','130 武将','AI 群雄','多存档'],
+    aqName: '征服纪元', aqSub: 'AGE OF CONQUEST',
+    aqDesc: '致敬英雄无敌3的回合制大策略:五大种族、42 种兵种、120+ 建筑、18 法术,在最大 96×96 的巨图上探索、建设、征服,单局可玩数小时。',
+    aqTags: ['回合策略','5 种族 42 兵种','超大地图','策略 AI','数小时体量'],
     gdName: '守护小村姑', gdSub: 'GUARD MAIDEN',
     gdDesc: '我的世界风 FPS×塔防护送:开枪杀僵尸、捡金币、B 键时停俯视建塔,护送 20 名村民进城门。弓箭手放冷箭,僵尸会把你的塔啃掉!',
     gdTags: ['FPS 射击','时停建造','护送村民','Three.js','3 难度'],
@@ -255,6 +270,9 @@ const I18N = {
     sgName: 'Three Kingdoms 196', sgSub: '三国烽火',
     sgDesc: 'Grand strategy in the Age of Warlords: 39 cities, 11 factions, 130 officers. Develop cities, march armies, burn & ambush, duel champions. Characterful AI rivals fight for the realm. Auto-save, 6 slots.',
     sgTags: ['Turn Strategy','39-City Map','130 Officers','AI Warlords','Save Slots'],
+    aqName: 'Age of Conquest', aqSub: '征服纪元',
+    aqDesc: 'A HoMM3-inspired turn-based grand strategy: 5 factions, 42 creatures, 120+ buildings and 18 spells on maps up to 96×96. Explore, build and conquer for hours.',
+    aqTags: ['Turn Strategy','5 Factions','Huge Maps','Strategy AI','Hours of Play'],
     gdName: 'Guard Maiden', gdSub: '守护小村姑',
     gdDesc: 'Minecraft-style FPS × tower-defense escort: shoot zombies, grab coins, press B to stop time and build towers top-down, escort 20 villagers to the city gate. Archers snipe from afar — and zombies chew your towers down!',
     gdTags: ['FPS','Time-stop Build','Escort','Three.js','3 Difficulties'],
@@ -750,9 +768,79 @@ function bgFill(c, w, h, top, bottom){
   window.__chDraw = draw;
 })();
 
+/* ============ 卡-AQ:征服纪元(类英雄无敌地图行军) ============ */
+(function(){
+  const cv = document.querySelector('#card-aq canvas');
+  const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+  const W = 128, H = 72;
+  /* 迷你地图像素画:地形块 */
+  const T = 8;
+  const terr = [];
+  let sd = 987654321;
+  const rnd = () => { sd = (sd * 1664525 + 1013904223) >>> 0; return sd / 4294967296; };
+  for (let y = 0; y < H / T; y++) {
+    terr[y] = [];
+    for (let x = 0; x < W / T; x++) {
+      const r = rnd();
+      if (y < 2 && r < 0.5) terr[y][x] = 2;           /* 山 */
+      else if (y > 7 && r < 0.35) terr[y][x] = 3;     /* 水 */
+      else terr[y][x] = r < 0.18 ? 1 : 0;             /* 草/林 */
+    }
+  }
+  const COLS = ['#4e7a3a', '#3c6630', '#5a555e', '#2d5a8e'];
+  const ROAD = [[8, 4], [9, 4], [10, 4], [11, 4], [12, 5], [12, 6], [11, 7], [10, 7], [9, 7], [8, 7], [7, 6], [7, 5]];
+  function draw(t) {
+    for (let y = 0; y < H / T; y++) for (let x = 0; x < W / T; x++) {
+      c.fillStyle = COLS[terr[y][x]];
+      c.fillRect(x * T, y * T, T, T);
+      if (terr[y][x] === 1) { c.fillStyle = '#2c5226'; c.fillRect(x * T + 3, y * T + 2, 2, 4); }
+    }
+    /* 道路 */
+    c.fillStyle = '#8f6f4a';
+    for (const [rx, ry] of ROAD) c.fillRect(rx * T, ry * T + 2, T, T - 4);
+    /* 迷雾(右上角未探索) */
+    c.fillStyle = 'rgba(6,8,16,0.85)';
+    c.beginPath(); c.moveTo(W, 0); c.lineTo(W, 30); c.lineTo(92, 12); c.lineTo(88, 0); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(W, 34); c.lineTo(W, H); c.lineTo(104, H); c.lineTo(96, 30); c.closePath(); c.fill();
+    /* 城堡与守卫塔 */
+    c.font = '13px serif'; c.textAlign = 'center';
+    c.fillText('🏰', 18, 34);
+    c.fillText('🗼', 96, 32);
+    /* 资源堆/宝箱 */
+    c.font = '8px serif';
+    c.fillText('🪙', 46, 22);
+    c.fillText('🧰', 70, 60);
+    c.fillText('⛏️', 40, 62);
+    /* 行军英雄沿路走 */
+    const ph = (t / 2600) % 1;
+    const idx = ph * (ROAD.length - 1);
+    const i0 = Math.floor(idx), fr = idx - i0;
+    const a = ROAD[Math.min(i0, ROAD.length - 1)], b = ROAD[Math.min(i0 + 1, ROAD.length - 1)];
+    const hx = (a[0] + (b[0] - a[0]) * fr) * T + T / 2;
+    const hy = (a[1] + (b[1] - a[1]) * fr) * T + T / 2 + Math.sin(t / 130) * 0.8;
+    c.font = '12px serif';
+    c.fillText('🤺', hx, hy + 4);
+    /* 旗帜(路径终点) */
+    c.font = '9px serif';
+    c.fillText('🚩', 26, 18);
+    /* 对战闪光:英雄接近塔楼时 */
+    if (ph > 0.72 && ph < 0.86 && (t % 400) < 200) {
+      c.font = '12px serif';
+      c.fillText('⚔️', 76, 40);
+    }
+    /* 金币拾取闪光 */
+    if (ph > 0.3 && ph < 0.42) {
+      c.fillStyle = '#ffd75e';
+      c.fillRect(44 + Math.sin(t / 90) * 2, 26, 2, 2);
+    }
+  }
+  window.__aqDraw = draw;
+})();
+
 /* ============ 统一动画循环 ============ */
 (function loop(){
   const t = performance.now();
+  window.__aqDraw && window.__aqDraw(t);
   window.__sgDraw && window.__sgDraw(t);
   window.__gdDraw && window.__gdDraw(t);
   window.__rcDraw && window.__rcDraw(t);
