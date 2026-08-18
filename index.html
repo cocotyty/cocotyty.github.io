@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a10">
-<meta name="description" content="cocotyty 的 Vibe Game 游戏廊 — 狂飙公路 · 魂火守卫 · 钢铁先锋 · 星穹编年史 / cocotyty's vibe game gallery">
+<meta name="description" content="cocotyty 的 Vibe Game 游戏廊 — 三国烽火 · 守护小村姑 · 狂飙公路 · 魂火守卫 · 钢铁先锋 · 星穹编年史 / cocotyty's vibe game gallery">
 <title>cocotyty · 像素游戏廊</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -133,9 +133,21 @@ footer a:hover{color:var(--gold)}
   <h2 class="sec-title" data-i18n="secTitle"></h2>
   <div class="gallery">
 
-    <a class="card" href="guard/" id="card-gd">
+    <a class="card" href="sg/" id="card-sg">
       <div class="card-thumb">
         <span class="badge-new">NEW!</span>
+        <canvas width="128" height="72"></canvas>
+      </div>
+      <div class="card-body">
+        <h3 class="card-title"><span data-i18n="sgName"></span><small data-i18n="sgSub"></small></h3>
+        <p class="card-desc" data-i18n="sgDesc"></p>
+        <div class="tags" data-i18n-tags="sgTags"></div>
+        <span class="card-go" data-i18n="goGame"></span>
+      </div>
+    </a>
+
+    <a class="card" href="guard/" id="card-gd">
+      <div class="card-thumb">
         <canvas width="128" height="72"></canvas>
       </div>
       <div class="card-body">
@@ -213,6 +225,9 @@ const I18N = {
     bio: 'Intel 软件工程师,目前在做 <b>LLM × Xeon 服务器 HeadNode 推理优化</b>,之前深耕<b>云原生</b>。<br>这里是我的 Vibe Game 游戏廊——和 AI 结对写的一些小游戏,<b>零依赖、浏览器直接玩</b>。',
     chipRepos: '公开仓库', chipFollowers: '关注者',
     secTitle: '☠ VIBE 游 戏 廊',
+    sgName: '三国烽火', sgSub: 'THREE KINGDOMS 196',
+    sgDesc: '群雄割据大战略:39 城 11 势力 130 员战将,内政征伐、火攻伏兵、武将单挑。AI 群雄逐鹿各有性格,多存档+自动保存,扫平乱世一统天下!',
+    sgTags: ['回合战略','39 城大地图','130 武将','AI 群雄','多存档'],
     gdName: '守护小村姑', gdSub: 'GUARD MAIDEN',
     gdDesc: '我的世界风 FPS×塔防护送:开枪杀僵尸、捡金币、B 键时停俯视建塔,护送 20 名村民进城门。弓箭手放冷箭,僵尸会把你的塔啃掉!',
     gdTags: ['FPS 射击','时停建造','护送村民','Three.js','3 难度'],
@@ -237,6 +252,9 @@ const I18N = {
     bio: 'Software engineer at Intel, currently optimizing <b>LLM inference on Xeon-server head nodes</b>; previously deep in <b>cloud native</b>.<br>This is my vibe game arcade — small games pair-built with AI, <b>zero deps, playable right in the browser</b>.',
     chipRepos: 'repos', chipFollowers: 'followers',
     secTitle: '☠ VIBE GAME ARCADE',
+    sgName: 'Three Kingdoms 196', sgSub: '三国烽火',
+    sgDesc: 'Grand strategy in the Age of Warlords: 39 cities, 11 factions, 130 officers. Develop cities, march armies, burn & ambush, duel champions. Characterful AI rivals fight for the realm. Auto-save, 6 slots.',
+    sgTags: ['Turn Strategy','39-City Map','130 Officers','AI Warlords','Save Slots'],
     gdName: 'Guard Maiden', gdSub: '守护小村姑',
     gdDesc: 'Minecraft-style FPS × tower-defense escort: shoot zombies, grab coins, press B to stop time and build towers top-down, escort 20 villagers to the city gate. Archers snipe from afar — and zombies chew your towers down!',
     gdTags: ['FPS','Time-stop Build','Escort','Three.js','3 Difficulties'],
@@ -312,7 +330,80 @@ function bgFill(c, w, h, top, bottom){
   c.fillStyle = g; c.fillRect(0,0,w,h);
 }
 
-/* ============ 卡0:守护小村姑 ============ */
+/* ============ 卡0:三国烽火 ============ */
+(function(){
+  const cv = document.querySelector('#card-sg canvas');
+  const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+  const W = 128, H = 72, GY = 46;
+  /* 势力旗色 */
+  const FLAGS = ['#3f7fd9','#9b59c9','#e04a3f','#3fae5a','#d9a83f'];
+  let t = 0, marchers = [];
+  for (let i = 0; i < 7; i++) marchers.push({ x: -12 - i * 17, ph: i * 1.2, fc: FLAGS[i % 5] });
+  function draw(now) {
+    t++;
+    /* 夜空 */
+    const g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#141024'); g.addColorStop(1, '#241a12');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    /* 星 */
+    c.fillStyle = '#cfd8ff';
+    for (let i = 0; i < 14; i++) {
+      if ((now / 500 + i) % 5 < 3.5) c.fillRect((i * 31 + 7) % W, (i * 13 + 3) % 22, 1, 1);
+    }
+    /* 月 */
+    c.fillStyle = '#f4e8c0'; c.fillRect(104, 8, 9, 9);
+    c.fillStyle = '#141024'; c.fillRect(101, 6, 6, 6);
+    /* 远山 */
+    c.fillStyle = '#1c1a28';
+    for (let x = 0; x < W; x += 28) {
+      const h = 14 + Math.sin(x * 0.3) * 5;
+      c.beginPath(); c.moveTo(x, GY); c.lineTo(x + 14, GY - h); c.lineTo(x + 28, GY); c.closePath(); c.fill();
+    }
+    /* 长城 + 烽火台 */
+    c.fillStyle = '#2a2634'; c.fillRect(0, GY, W, 5);
+    for (let x = 0; x < W; x += 9) c.fillRect(x, GY - 3, 5, 3);
+    c.fillStyle = '#332e40'; c.fillRect(88, GY - 14, 14, 14);
+    c.fillStyle = '#221e2c';
+    c.fillRect(86, GY - 17, 4, 4); c.fillRect(93, GY - 17, 4, 4); c.fillRect(100, GY - 17, 4, 4);
+    /* 烽火 */
+    const fl = Math.sin(now / 90) * 2;
+    c.fillStyle = '#ff8a2a'; c.fillRect(91, GY - 26 - fl, 8, 10 + fl);
+    c.fillStyle = '#ffd05a'; c.fillRect(93, GY - 23 - fl * .5, 4, 7);
+    if (Math.random() < 0.25) {
+      c.fillStyle = '#ff9a52';
+      c.fillRect(90 + Math.random() * 12, GY - 30 - Math.random() * 8, 1, 1);
+    }
+    /* 地面 */
+    c.fillStyle = '#1a140e'; c.fillRect(0, GY + 5, W, H - GY - 5);
+    c.fillStyle = '#241c12';
+    for (let x = 0; x < W; x += 12) c.fillRect(x + (x % 24 ? 3 : 7), 58 + (x % 18) % 9, 5, 1);
+    /* 行军将士 */
+    marchers.forEach((s, i) => {
+      s.x += 0.32;
+      if (s.x > W + 16) { s.x = -14; }
+      const bob = Math.abs(Math.sin(now / 150 + s.ph)) * 1.5;
+      const x = s.x, y = 62 + (i % 2) * 4 - bob;
+      /* 旗 */
+      c.fillStyle = '#0e0c12'; c.fillRect(x + 5, y - 13, 1, 8);
+      c.fillStyle = s.fc; c.fillRect(x + 6, y - 13, 6, 4);
+      /* 人 */
+      c.fillStyle = '#0e0c12';
+      c.fillRect(x, y - 6, 5, 6);
+      c.fillRect(x + 1, y, 1, 3); c.fillRect(x + 3, y, 1, 3);
+      c.fillRect(x + 5, y - 9, 1, 8);
+    });
+    /* 远处攻城火光 */
+    if ((now / 900) % 3 < 1) {
+      c.fillStyle = 'rgba(255,138,42,0.35)';
+      c.fillRect(8, GY - 8, 18, 6);
+      c.fillStyle = '#ffd05a';
+      c.fillRect(14 + Math.sin(now / 100) * 2, GY - 7, 3, 3);
+    }
+  }
+  window.__sgDraw = draw;
+})();
+
+/* ============ 卡1:守护小村姑 ============ */
 (function(){
   const cv = document.querySelector('#card-gd canvas');
   const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
@@ -662,6 +753,7 @@ function bgFill(c, w, h, top, bottom){
 /* ============ 统一动画循环 ============ */
 (function loop(){
   const t = performance.now();
+  window.__sgDraw && window.__sgDraw(t);
   window.__gdDraw && window.__gdDraw(t);
   window.__rcDraw && window.__rcDraw(t);
   window.__tdDraw && window.__tdDraw(t);

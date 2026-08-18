@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d14">
+<meta name="description" content="三国烽火 · 群雄割据 196 — 回合制大国战略:40城11势力130武将,内政军事外交,扫平群雄一统天下">
+<title>三国烽火 · 群雄割据</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"></noscript>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ 顶栏 ============ -->
+<header id="topbar" class="hidden">
+  <div id="tb-faction"><span id="tb-flag"></span><span id="tb-name">—</span></div>
+  <div id="tb-date"><span id="tb-year">196</span>年<span id="tb-month">1</span>月</div>
+  <div id="tb-res">
+    <span class="res">🪙<b id="tb-gold">0</b></span>
+    <span class="res">🌾<b id="tb-food">0</b></span>
+    <span class="res">🏯<b id="tb-cities">0</b></span>
+    <span class="res">🎖<b id="tb-gens">0</b></span>
+  </div>
+  <div id="tb-btns">
+    <button class="tbtn" id="btn-intel">情报</button>
+    <button class="tbtn" id="btn-gens">武将</button>
+    <button class="tbtn" id="btn-log">月报</button>
+    <button class="tbtn" id="btn-menu">☰</button>
+    <button class="tbtn primary" id="btn-endturn">结束一月</button>
+  </div>
+</header>
+
+<!-- ============ 地图 ============ -->
+<main id="map-wrap">
+  <canvas id="map"></canvas>
+  <div id="map-hint" class="hidden">点击城池下达指令 · 滚轮缩放 · 拖动平移</div>
+  <div id="autosave-tip" class="hidden">✓ 已自动保存</div>
+</main>
+
+<!-- ============ 城池面板 ============ -->
+<aside id="city-panel" class="hidden">
+  <div id="cp-head">
+    <span id="cp-flag"></span>
+    <span id="cp-name">—</span>
+    <span id="cp-owner" class="dim">—</span>
+    <button id="cp-close">✕</button>
+  </div>
+  <div id="cp-stats" class="stat-grid"></div>
+  <div id="cp-gens"></div>
+  <div id="cp-actions"></div>
+  <div id="cp-detail"></div>
+</aside>
+
+<!-- ============ 战斗覆盖层 ============ -->
+<div id="battle-overlay" class="hidden">
+  <div id="bt-box">
+    <div id="bt-title">⚔ 攻城战</div>
+    <div id="bt-sides">
+      <div class="bt-side" id="bt-atk">
+        <div class="bt-fac" id="bt-atk-fac">攻</div>
+        <div class="bt-gens" id="bt-atk-gens"></div>
+        <div class="bt-bar"><div id="bt-atk-fill"></div></div>
+        <div class="bt-num" id="bt-atk-num">0</div>
+        <div class="bt-morale" id="bt-atk-mor">士气 --</div>
+      </div>
+      <div id="bt-vs">VS</div>
+      <div class="bt-side" id="bt-def">
+        <div class="bt-fac" id="bt-def-fac">守</div>
+        <div class="bt-gens" id="bt-def-gens"></div>
+        <div class="bt-bar def"><div id="bt-def-fill"></div></div>
+        <div class="bt-num" id="bt-def-num">0</div>
+        <div class="bt-morale" id="bt-def-mor">士气 --</div>
+      </div>
+    </div>
+    <canvas id="bt-canvas" width="320" height="120"></canvas>
+    <div id="bt-log"></div>
+    <div id="bt-tactics"></div>
+    <div id="bt-btns">
+      <button id="bt-auto" class="tbtn">委任指挥</button>
+      <button id="bt-next" class="tbtn primary">开战 ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 覆盖菜单(主菜单/存档/情报/武将/帮助) ============ -->
+<div id="overlay" class="hidden">
+  <div id="ov-box">
+    <div id="ov-title">三国烽火</div>
+    <div id="ov-body"></div>
+    <div id="ov-btns"></div>
+  </div>
+</div>
+
+<!-- ============ 开始画面 ============ -->
+<div id="title-screen">
+  <div id="title-art-row">
+    <img id="title-art" src="assets/han_male.png" alt="汉将"
+      onerror="this.style.display='none'">
+    <div id="title-art-col">
+      <canvas id="title-canvas" width="480" height="270"></canvas>
+      <div id="title-box">
+        <h1>三国烽火</h1>
+        <div class="title-sub">群雄割据 · 建安元年</div>
+        <p class="title-desc">汉室倾颓,群雄并起。39 城 11 势力 130 员战将,<br>内政、征伐、计谋、单挑——扫平乱世,一统天下。</p>
+        <div id="title-btns">
+          <button id="btn-continue" class="tbtn primary big hidden">▶ 继续征战</button>
+          <button id="btn-new" class="tbtn big">⚔ 新的征程</button>
+          <button id="btn-load-title" class="tbtn big">📜 读取存档</button>
+        </div>
+        <div class="title-credit">美术:程序化像素 + CC0 汉服立绘(OpenGameArt) · 引擎:纯原生 JS</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/save.js"></script>
+<script src="js/game.js"></script>
+<script src="js/map.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
