@@ -55,13 +55,19 @@ sg/
 └── test/
     ├── sim.mjs     无头平衡模拟:node sg/test/sim.mjs [局数] [月数]
     ├── trace.mjs   单局战报跟踪
-    └── snapshot.mjs 势力兴衰快照
+    ├── snapshot.mjs 势力兴衰快照
+    ├── regress.mjs 回归单测:单挑归属/俘虏formerFaction/存档槽指向
+    ├── ui-regress.mjs UI 回归(DOM 桩):月末双结算守卫等
+    └── e2e.mjs     CDP 端到端:标题→开局→内政→出征→战斗→存读档
 ```
 
 ### 测试
 
 - 逻辑层与 UI 完全解耦,引擎可在 Node 中直接运行
 - 平衡模拟:`node sg/test/sim.mjs 60 300`
+- 回归单测:`node sg/test/regress.mjs && node sg/test/ui-regress.mjs`
+- 端到端:先 `python -m http.server 8080`,再 `node sg/test/e2e.mjs`
+  (CDP 驱动本机 Chrome/Edge,捕获页面异常;覆盖按钮处理链路)
 - 浏览器回归:打开 `sg/?autotest=1`,17 项自动化断言(新游戏→内政→出征→
   行军→战斗 UI→攻城→结算→自动存档→读档→24 月 AI 推演),标题变为
   `AUTOTEST-PASS` 即全过

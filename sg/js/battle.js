@@ -186,10 +186,13 @@ const SGBattle = (() => {
   function startDuel(g, b, proposerSide) {
     const aSide = proposerSide === 'atk' ? b.atk : b.def;
     const dSide = proposerSide === 'atk' ? b.def : b.atk;
-    const aG = g.generals[aSide.gens[0]] || { force: 50, name: '无名将' };
-    /* 守方接受:武力差>15 时 70% 拒战(避免送死),AI 已在战术层避免 */
     b.phase = 'duel';
-    b.duel = { a: aSide.gens[0] || '偏将', d: dSide.gens[0] || '贼首', round: 0, log: [], done: false };
+    /* aSide/dSide 记录两侧归属,胜负结算按实际归属惩罚败方 */
+    b.duel = {
+      a: aSide.gens[0] || '偏将', d: dSide.gens[0] || '贼首',
+      aSide: proposerSide, dSide: proposerSide === 'atk' ? 'def' : 'atk',
+      round: 0, log: [], done: false,
+    };
     log(b, `⚔ ${b.duel.a} 拍马出阵,直取 ${b.duel.d}!`);
   }
 
@@ -213,8 +216,9 @@ const SGBattle = (() => {
       const loser = pa > pd ? gd : ga;
       du.done = true; b.phase = 'fight';
       du.log.push(`${winner.name}卖个破绽,大喝一声,将${loser.name}斩于马下!`);
-      /* 败方全军士气大跌,兵力小损 */
-      const loserSide = winner === ga ? b.def : b.atk;
+      /* 败方全军士气大跌,兵力小损(按武将实际所属判定,与谁发起无关) */
+      const winnerSideKey = winner.name === du.a ? du.aSide : du.dSide;
+      const loserSide = winnerSideKey === 'atk' ? b.def : b.atk;
       loserSide.morale = clamp(loserSide.morale - 25, 0, 100);
       loserSide.troops -= Math.round(loserSide.troops * 0.04);
       winner.kills = (winner.kills || 0) + 1;
@@ -277,6 +281,7 @@ const SGBattle = (() => {
           const to = g.adj[b.city].map(x => g.cities[x]).filter(c => c.owner === oldOwner);
           if (to.length) { gen.city = to[irnd(to.length)].name; return; }
         }
+        gen.formerFaction = gen.faction;
         gen.status = 'captured'; gen.faction = null;
         b.prisoners = b.prisoners || [];
         b.prisoners.push(n);
@@ -311,7 +316,7 @@ const SGBattle = (() => {
       atk.gens.forEach(n => {
         const gen = g.generals[n];
         if (gen && gen.status === 'moving') {
-          if (Math.random() < 0.3) { gen.status = 'captured'; gen.faction = null; b.prisoners = b.prisoners || []; b.prisoners.push(n); }
+          if (Math.random() < 0.3) { gen.formerFaction = gen.faction; gen.status = 'captured'; gen.faction = null; b.prisoners = b.prisoners || []; b.prisoners.push(n); }
           else { gen.status = 'free'; gen.faction = null; }
         }
       });

@@ -12,6 +12,9 @@ const SGUI = (() => {
   let playerSide = null;
   let chosenTactic = 0;
   let logShown = false;
+  let autoTimer = null;         // 委任战斗后的延时关闭
+  let turnSeq = 0;              // 本次结束月序号(防月末双结算)
+  let finishedSeq = -1;         // 已结算过的序号
 
   /* ================= 顶栏 ================= */
   function updateTopbar(g) {
@@ -108,12 +111,12 @@ const SGUI = (() => {
   function handleAction(g, name, act) {
     const c = g.cities[name];
     const gens = SGEngine.cityGenerals(g, name).filter(x => x.faction === g.playerFaction);
-    if (!gens.length && ['agri', 'com', 'conscript', 'train', 'repair', 'search'].includes(act)) {
+    if (!gens.length && ['agri', 'com', 'conscript', 'train', 'repair', 'search', 'recruit'].includes(act)) {
       cpMsg('城中无可用武将');
       return;
     }
     const best = {
-      agri: byPol, com: byPol, conscript: byChar, train: byLead,
+      agri: byPol, com: byPol, conscript: byCharm, train: byLead,
       repair: byPol, search: byCharm, recruit: byCharm,
     }[act] || byPol;
 
@@ -315,6 +318,7 @@ const SGUI = (() => {
     $('btn-endturn').disabled = true;
     const result = SGGame.endTurn();
     if (result.phase === 'battle') {
+      turnSeq++;
       pendingBattles = result.battles.slice();
       nextBattle();
     } else {
@@ -324,6 +328,9 @@ const SGUI = (() => {
 
   function nextBattle() {
     if (!pendingBattles.length) {
+      /* 同一结束月只允许结算一次(双击"战后"/委任延时可能重复进入) */
+      if (finishedSeq === turnSeq) return;
+      finishedSeq = turnSeq;
       finishTurnUI(SGGame.finishTurn());
       return;
     }
@@ -356,6 +363,7 @@ const SGUI = (() => {
     curBattle = b;
     playerSide = b.atk.faction === g.playerFaction ? 'atk' : 'def';
     chosenTactic = 0;
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }   // 上一场的委任延时关闭作废
     $('battle-overlay').classList.remove('hidden');
     const atkF = g.factions[b.atk.faction], defF = g.factions[b.def.faction];
     $('bt-title').textContent = `⚔ ${atkF ? atkF.name : '?'}军 攻 ${b.city}${defF ? ' · ' + defF.name : ''}`;
@@ -386,7 +394,7 @@ const SGUI = (() => {
       SGGame.battleAuto(b, playerSide);
       renderBattle(g, b);
       appendBattleLog(b);
-      setTimeout(closeBattle, 900);
+      autoTimer = setTimeout(() => { autoTimer = null; closeBattle(); }, 900);
     };
   }
 
@@ -634,12 +642,12 @@ const SGUI = (() => {
   function showHelp() {
     showOverlay('❓ 玩法说明', `
       <div style="font-size:9px;line-height:2.3;color:var(--text)">
-      🎯 <b style="color:var(--gold)">目标</b>:占领全部 40 城,一统天下。<br>
+      🎯 <b style="color:var(--gold)">目标</b>:占领全部 39 城,一统天下。<br>
       🏯 <b style="color:var(--gold)">内政</b>:点击己方城池,每城每月一道政令——开垦(增产粮)、商业(增收金)、征兵、训练、修城、搜索、录用在野贤才。<br>
       ⚔️ <b style="color:var(--gold)">出征</b>:从己方城发兵攻打相邻敌城,行军一月到达接战。多路合兵可围攻同一目标。<br>
       🔥 <b style="color:var(--gold)">战术</b>:战斗中可换战术——猛攻/坚守/火攻(需智将)/伏兵(需劣势)/单挑(需猛将)。智力与武力的对决!<br>
       🌾 <b style="color:var(--gold)">经济</b>:每年七月秋收;兵马每月食粮,断粮则逃兵四起。输送指令可调兵运粮。<br>
-      💌 <b style="color:var(--gold)">忠诚</b>: loyalty 低的武将会叛逃,多赏赐金帛。<br>
+      💌 <b style="color:var(--gold)">忠诚</b>:忠诚低的武将会叛逃,多赏赐金帛。<br>
       💾 <b style="color:var(--gold)">存档</b>:每月结束自动保存,菜单里可手动存 6 槽。
       </div>`, [['返回', showMenu]]);
   }

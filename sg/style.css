@@ -116,7 +116,7 @@ button{font-family:var(--font)}
 #bt-btns{display:flex;gap:8px;justify-content:center;margin-top:4px}
 
 /* ---------- 覆盖菜单 ---------- */
-#overlay{position:fixed;inset:0;z-index:90;background:#05050ae0;
+#overlay{position:fixed;inset:0;z-index:130;background:#05050ae0;
   display:flex;align-items:center;justify-content:center;padding:12px}
 #ov-box{width:min(720px,96vw);max-height:92vh;overflow-y:auto;
   background:linear-gradient(180deg,#181826,#12121c);border:2px solid var(--line2);

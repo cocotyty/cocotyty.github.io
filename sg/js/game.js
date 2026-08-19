@@ -16,7 +16,7 @@ const SGGame = (() => {
 
   function startNew(factionId, difficulty) {
     g = SGEngine.newGame(factionId, difficulty);
-    SGSave.save(0, g, false);        // 新开局写入槽0并记录
+    SGSave.save(0, g, true);        // 新开局写入槽0并记录为最近存档(避免自动保存误覆旧槽)
     return g;
   }
 
