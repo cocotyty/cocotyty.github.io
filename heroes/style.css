@@ -98,7 +98,10 @@ input, select {
   z-index: 5;
 }
 #res-bar { display: flex; gap: 10px; flex-wrap: wrap; }
-.res { font-size: 13px; white-space: nowrap; }
+.res { font-size: 13px; white-space: nowrap; cursor: default; }
+.res .inc {
+  font-style: normal; color: var(--green); font-size: 11px; margin-left: 2px; opacity: 0.85;
+}
 #date-bar, #turn-bar { font-size: 13px; color: var(--dim); white-space: nowrap; }
 .top-btns { margin-left: auto; display: flex; gap: 8px; }
 #main-row { flex: 1; display: flex; min-height: 0; }
@@ -225,7 +228,10 @@ input, select {
 .bld.built { opacity: 0.75; border-color: #3d5a34; }
 .bld.can { cursor: pointer; border-color: #8a6d1c; }
 .bld.can:hover { border-color: var(--gold); box-shadow: 0 0 10px #f2cf4622; }
+.bld.confirm { border-color: var(--gold); box-shadow: 0 0 12px #f2cf4655; }
+.confirm-hint { color: var(--gold); }
 .bld.lock { opacity: 0.45; }
+.bld .lack { color: #ff8f88; font-size: 11px; }
 .bld-emoji { font-size: 24px; }
 .bld-name { font-weight: 700; color: #ffedd0; margin: 2px 0; }
 .bld-cost { color: var(--gold); font-size: 11px; }
@@ -243,6 +249,26 @@ input, select {
 .ci-avail { font-size: 12px; text-align: right; white-space: nowrap; }
 .ci-buy { display: flex; gap: 6px; align-items: center; }
 .ci-buy input { width: 64px; }
+.btn.mini { padding: 7px 8px; font-size: 12px; }
+
+/* 战后结算 */
+.battle-result { margin: 6px 0; }
+.br-title { color: var(--dim); font-size: 12px; margin-bottom: 4px; }
+.br-row {
+  display: flex; justify-content: space-between; gap: 20px;
+  background: var(--panel2); border: 1px solid var(--line);
+  padding: 4px 10px; margin-bottom: 3px; font-size: 13px;
+}
+.br-row .loss { color: #ff8f88; }
+.br-exp { color: #ffe8a8; font-size: 13px; margin-top: 6px; }
+
+/* 日志 */
+.log-list { max-height: 320px; overflow-y: auto; font-size: 13px; }
+.log-item { padding: 4px 2px; border-bottom: 1px solid var(--line); }
+.log-item i { font-style: normal; color: var(--dim); margin-right: 8px; font-size: 11px; }
+
+/* 结束回合提醒 */
+.no-warn { display: block; margin-top: 10px; cursor: pointer; }
 
 .tavern-row { display: flex; gap: 10px; }
 .tavern-offer {

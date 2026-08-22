@@ -7,6 +7,16 @@
   const { CREATURES, SPELLS, ARTIFACTS, unitPower, FACTIONS } = G;
 
   /* ==================== 战场AI ==================== */
+  /* 战斗调度:防守方是玩家且 UI 注册了防守钩子 → 交给玩家亲自指挥 */
+  function runBattle(game, b, need) {
+    const defHuman = (b.defHero && b.defHero.owner === 0) ||
+      (need && need.kind === 'town' && need.obj && need.obj.owner === 0);
+    if (defHuman && game.uiHooks && game.uiHooks.defendBattle) {
+      return game.uiHooks.defendBattle(b, need);
+    }
+    return playBattle(game, b);
+  }
+
   function playBattle(game, b) {
     let guard = 0, lastRound = b.round;
     while (!b.over && guard++ < 1200) {
@@ -174,7 +184,7 @@
   }
 
   /* ==================== 战略AI ==================== */
-  function playTurn(game) {
+  async function playTurn(game) {
     const p = game.players[game.curPlayer];
     if (p.defeated || p.isHuman) return;
     /* 0. 市场:卖出富余资源换金币,或为紧缺资源补货 */
@@ -214,7 +224,7 @@
       let acts = 0;
       while (acts++ < 8) {
         if (h.dead || h.moveLeft < 60) break;
-        const more = heroAct(game, p, h);
+        const more = await heroAct(game, p, h);
         if (!more) break;
       }
       if (!h.dead) h.path = h.path && h.path.length ? h.path : null;
@@ -313,7 +323,7 @@
     }
   }
   /* ---- 英雄行动 ---- */
-  function heroAct(game, p, hero) {
+  async function heroAct(game, p, hero) {
     /* 驻防期:刚占下的城守两天 */
     if (hero.garrisonUntil && game.day <= hero.garrisonUntil && hero.anchorTown) {
       const t = game.objects.find(o => o.id === hero.anchorTown);
@@ -330,7 +340,7 @@
       const path = G.findPath(game, hero, hero.x, hero.y, home.x, home.y);
       if (path && path.path.length) {
         hero.path = path.path;
-        const r = G.Game.moveAlong(game, hero, (b) => playBattle(game, b));
+        const r = await G.Game.moveAlong(game, hero, (b, h2, need) => runBattle(game, b, need));
         if (r.status === 'wait' && r.need && r.need.type === 'town') tryRecruit(game, p, r.need.obj);
         if (hero.x === home.x && hero.y === home.y) tryRecruit(game, p, home);
         return !hero.dead && G.Game.armyCount(hero.army) > 0;
@@ -346,7 +356,7 @@
         const path = G.findPath(game, hero, hero.x, hero.y, home.x, home.y);
         if (path) {
           hero.path = path.path;
-          G.Game.moveAlong(game, hero, (b) => playBattle(game, b));
+          await G.Game.moveAlong(game, hero, (b, h2, need) => runBattle(game, b, need));
           return !hero.dead;
         }
       }
@@ -397,7 +407,7 @@
     if (best) {
       hero.path = best.steps.path;
       const bx = hero.x, by = hero.y;
-      const r = G.Game.moveAlong(game, hero, (b) => playBattle(game, b));
+      const r = await G.Game.moveAlong(game, hero, (b, h2, need) => runBattle(game, b, need));
       if (G.AI._dbgMove) G.AI._dbgMove(hero, best, r, bx, by);
       /* 到达己方城镇立即补充兵力 */
       if (!hero.dead) {
@@ -414,7 +424,7 @@
         const path = G.findPath(game, hero, hero.x, hero.y, home.x, home.y);
         if (path) {
           hero.path = path.path;
-          G.Game.moveAlong(game, hero, (b) => playBattle(game, b));
+          await G.Game.moveAlong(game, hero, (b, h2, need) => runBattle(game, b, need));
           return false;
         }
       }

@@ -66,6 +66,7 @@
     /* 游戏内按钮 */
     G.UI.bindBattleInput();
     $('btn-menu').onclick = () => G.UI.openMenuModal();
+    $('btn-help').onclick = () => G.UI.openHelp();
     $('btn-next-hero').onclick = () => G.UI.nextHero();
     $('btn-end-turn').onclick = () => G.UI.endTurnClick();
   }

@@ -230,13 +230,11 @@
   const armyCount = (army) => army.reduce((n, s) => n + (s && s.count > 0 ? s.count : 0), 0);
 
   /* ================= 回合 ================= */
-  function beginTurn(game) {
-    const p = game.players[game.curPlayer];
-    if (p.defeated) { endTurn(game); return; }
-    /* 收入 */
+  /* 每日收入结算(UI 悬停提示复用):返回 {gold, wood, ...} */
+  function playerIncome(game, pid) {
     let income = 0, daily = {};
     const has = (town, id) => town.buildings.includes(id);
-    for (const t of ownTowns(game, p.id)) {
+    for (const t of ownTowns(game, pid)) {
       if (has(t, 'capitol')) income += 4000;
       else if (has(t, 'cityHall')) income += 2000;
       else if (has(t, 'townHall')) income += 1000;
@@ -244,19 +242,28 @@
       if (has(t, 'silo')) { daily.wood = (daily.wood || 0) + 2; daily.ore = (daily.ore || 0) + 2; }
       if (has(t, 'sp_rampart')) income += 350;
       if (has(t, 'sp_inferno')) daily.sulfur = (daily.sulfur || 0) + 1;
-      const def = MINE_DEFS;
-      void def;
     }
     for (const o of game.objects) {
-      if (MINE_DEFS[o.type] && o.owner === p.id) {
+      if (MINE_DEFS[o.type] && o.owner === pid) {
         const m = MINE_DEFS[o.type];
         if (m.res === 'gold') income += m.n;
         else daily[m.res] = (daily[m.res] || 0) + m.n;
       }
     }
     for (const h of game.heroes) {
-      if (h.owner === p.id && !h.dead) income += (h.goldPerDay || 0) + [0, 150, 300, 500][h.skills.estates || 0];
+      if (h.owner === pid && !h.dead) income += (h.goldPerDay || 0) + [0, 150, 300, 500][h.skills.estates || 0];
     }
+    daily.gold = income;
+    return daily;
+  }
+
+  function beginTurn(game) {
+    const p = game.players[game.curPlayer];
+    if (p.defeated) { endTurn(game); return; }
+    /* 收入 */
+    const daily = playerIncome(game, p.id);
+    const income = daily.gold;
+    delete daily.gold;
     const aiMul = !p.isHuman && game.difficulty === 'hard' ? 1.3 : (!p.isHuman && game.difficulty === 'insane' ? 1.6 : 1);
     p.resources.gold += Math.round(income * aiMul);
     addRes(p.resources, daily);
@@ -333,8 +340,9 @@
 
   /* ================= 移动与交互 ================= */
   /* hero.path: [{x,y}...]。逐步执行,遇事件暂停。
+   * 异步:战斗 runner 可返回 Promise(玩家亲自防守时),结果 await 后继续。
    * 返回 {status:'done'|'wait', need?:{...}} */
-  function moveAlong(game, hero, onEvent) {
+  async function moveAlong(game, hero, onEvent) {
     if (!hero.path || !hero.path.length) return { status: 'done' };
     const pi = hero.owner;
     while (hero.path.length) {
@@ -345,12 +353,10 @@
       hero.moveLeft -= cost;
       hero.x = step.x; hero.y = step.y;
       revealAt(game, pi, step.x, step.y, heroSight(hero));
-      const o = game.objAt[step.y * game.map.w + step.x];
-      if (!o) continue;
-      const need = interact(game, hero, o);
+      const need = stepEvent(game, hero, step.x, step.y);
       if (need) {
         if (need.type === 'battle') {
-          const res = resolveBattleNeed(game, hero, need, onEvent);
+          const res = await resolveBattleNeed(game, hero, need, onEvent);
           if (res === 'lost') return { status: 'dead' };
           if (res === 'stop') return { status: 'done' };
         } else {
@@ -359,6 +365,16 @@
       }
     }
     return { status: 'done' };
+  }
+
+  /* 到达一格时的事件:敌方英雄(野战)优先,其次地面物件 */
+  function stepEvent(game, hero, x, y) {
+    const foe = game.heroes.find(hh => !hh.dead && hh.owner !== hero.owner && hh.x === x && hh.y === y);
+    if (foe) {
+      return { type: 'battle', kind: 'hero', obj: null, defHero: foe, defArmy: foe.army.filter(s => s && s.count > 0) };
+    }
+    const o = game.objAt[y * game.map.w + x];
+    return o ? interact(game, hero, o) : null;
   }
 
   /* 触发物件;返回 need 或 null(自动完成) */
@@ -559,10 +575,11 @@
     game.stats.battles++;
     return G.Battle.create({ hero, army: hero.army }, { hero: need.defHero, army: need.defArmy }, { siegeDef: need.siegeDef || 0 });
   }
-  function resolveBattleNeed(game, hero, need, onEvent) {
+  async function resolveBattleNeed(game, hero, need, onEvent) {
     const b = createBattleNeed(game, hero, need);
     const runner = onEvent || ((battle) => G.AI.playBattle(game, battle));
-    runner(b, hero);
+    const r = runner(b, hero, need);
+    if (r && typeof r.then === 'function') await r;
     return finishBattleNeed(game, hero, need, b);
   }
   function finishBattleNeed(game, hero, need, b) {
@@ -588,6 +605,9 @@
         removeObject(game, need.obj);
       } else if (need.kind === 'mine') {
         captureMine(game, hero, need.obj);
+      } else if (need.kind === 'hero') {
+        /* 击败敌方英雄:对方阵亡 */
+        if (need.defHero) heroDeath(game, need.defHero);
       } else if (need.kind === 'town') {
         captureTown(game, hero, need.obj);
         return 'stop';
@@ -836,6 +856,7 @@
     refreshTavern, hireHero, marketRate, trade,
     serialize, deserialize, saveGame, loadGame,
     ownTowns, ownHeroes, pushLog, rnd, rndInt, rndPick, rndChance,
+    stepEvent, playerIncome,
     PLAYER_COLORS,
   };
 })(typeof window !== 'undefined' ? (window.HOMM = window.HOMM || {}) : (globalThis.HOMM = globalThis.HOMM || {}));
